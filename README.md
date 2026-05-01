@@ -1,3 +1,5 @@
+<p align="center"><img src="github/images/cobaltLogoWide.png" alt="Cobalt Log" height="300"></img></p>
+
 # Cobalt Engine
 This repository contains the source code for the Cobalt Engine Editor, Cobalt Engine SDK, and example projects.
 Cobalt Engine is a game engine written in Odin focused on giving a minimal-abstraction scripting system to users with a powerful editor to build complex scenes. The editor and project are seperate, and while both rely on the SDK, the editor only functions to edit scenes and automate building. Scripting is availible in Odin with a custom-built ECS, and allows users to write code like a regular program that interacts with the SDK as opposed to the engine taking over.
