@@ -21,18 +21,30 @@ main :: proc() {
 
     user_proj_dir := strings.trim_space(string(buf[:n]))
     fmt.printfln("Using project folder '%v'", user_proj_dir)
-    user_proj_dir = strings.concatenate({user_proj_dir, "\\cbesdk"})
 
     // Copy SDK to the project folder (windows)
-    desc := os.Process_Desc{
-        command = []string{"xcopy", CBESDK_DIR, user_proj_dir, "/E", "/I"},
+    copy_cmd := os.Process_Desc{
+        command = []string{"xcopy", CBESDK_DIR, strings.concatenate({user_proj_dir, "\\cbesdk"}), "/E", "/I", "/Y"},
     }
-
-    // Start the process
-    state, stdout, stderr, err_p := os.process_exec(desc, context.allocator)
+    state, stdout, stderr, err_p := os.process_exec(copy_cmd, context.allocator)
     if err_p != nil {
         fmt.eprintln("Error copying SDK to project folder:", err_p)
         return
     }
+
+    // Build and run user program
+    build_cmd := os.Process_Desc{
+        working_dir = user_proj_dir,
+        command     = []string{"odin", "run", "assets/src/", "-collection:cobalt=../../", "-out:cbesdk/cbe.exe"},
+    }
+    state, stdout, stderr, err_p = os.process_exec(build_cmd, context.allocator)
+    if err_p != nil {
+        fmt.eprintln("Error building project:", err_p)
+        return
+    }
+
+    // This can get quite long if the app runs for a while,
+    // should redirect this somewhere else soon
+    fmt.print(string(stdout))
 
 }

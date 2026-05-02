@@ -5,8 +5,9 @@ import "core:reflect"
 import "core:mem"
 
 Application :: struct {
-    scene:    Scene,
-    registry: TypeRegistry,
+    scene:      Scene,
+    registry:   TypeRegistry,
+    render_ctx: RenderContext,
 }
 
 // Just the state of an ECS
@@ -126,17 +127,27 @@ load_scene :: proc(registry: TypeRegistry) -> Scene {
 create_application :: proc(registry: TypeRegistry) -> Application {
 
     return Application {
-        scene    = load_scene(registry),
-        registry = registry,
+        scene      = load_scene(registry),
+        registry   = registry,
+        render_ctx = create_render_ctx(),
     }
 
 }
 
 run_application :: proc(app: Application) {
 
-    // Hardcoded so no infinite loop but testing
     start_scene(app.scene)
-    update_scene(app.scene)
-    update_scene(app.scene)
+    
+    loop: for {
+
+        update_scene(app.scene)
+        res := run_render(app.render_ctx)
+
+        // Exit app
+        if res {
+            break loop
+        }
+
+    }
 
 }
