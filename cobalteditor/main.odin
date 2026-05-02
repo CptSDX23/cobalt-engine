@@ -21,7 +21,7 @@ main :: proc() {
 
     user_proj_dir := strings.trim_space(string(buf[:n]))
     fmt.printfln("Using project folder '%v'", user_proj_dir)
-    user_proj_dir = strings.concatenate({user_proj_dir, "\\cbeskd"})
+    user_proj_dir = strings.concatenate({user_proj_dir, "\\cbesdk"})
 
     // Copy SDK to the project folder (windows)
     desc := os.Process_Desc{
