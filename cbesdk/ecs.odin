@@ -20,6 +20,7 @@ Component :: struct {
 // Override procedures to give system functionality
 System :: struct {
     name:   string,
+    start:  proc(scene: Scene),
     update: proc(scene: Scene, deltaTime: f32)
 }
 

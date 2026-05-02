@@ -28,6 +28,17 @@ update_scene :: proc(scene: Scene) {
 
 }
 
+start_scene :: proc(scene: Scene) {
+
+    components := scene.components[:]
+    systems    := scene.systems[:]
+
+    for system in systems {
+        system.start(scene)
+    }
+
+}
+
 // Returns an array of copies of the components and indices to write the copies back
 query_scene_components :: proc(scene: Scene, $T: typeid) -> ([dynamic]T, [dynamic]i32) {
 
@@ -124,6 +135,7 @@ create_application :: proc(registry: TypeRegistry) -> Application {
 run_application :: proc(app: Application) {
 
     // Hardcoded so no infinite loop but testing
+    start_scene(app.scene)
     update_scene(app.scene)
     update_scene(app.scene)
 

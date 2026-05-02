@@ -1,7 +1,7 @@
 package cbetestproj
 
 import "core:fmt"
-import "../../../cbesdk"
+import "cobalt:cbesdk"
 
 TestComponent :: struct {
     value: f32,
@@ -22,13 +22,14 @@ test_component_constructor :: proc(args: [dynamic]any) -> any {
 
 test_system := cbesdk.System {
 
-    name = "TestSystem",
-
+    name   = "TestSystem",
+    start  = proc(scene: cbesdk.Scene) {
+        fmt.println("Started TestSystem")
+    },
     update = proc(scene: cbesdk.Scene, deltaTime: f32) {
 
         matches, indices := cbesdk.query_scene_components(scene, TestComponent)
-        fmt.println(matches[0].value)
-        //fmt.println(len(matches))
+        fmt.printfln("First match's value before adding: %v", matches[0].value)
         matches[0].value += 10
         cbesdk.write_back_components(scene, TestComponent, matches, indices)
 
