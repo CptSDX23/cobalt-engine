@@ -140,7 +140,7 @@ run_application :: proc(app: Application) {
     
     loop: for {
 
-        update_scene(app.scene)
+        // update_scene(app.scene)
         res := run_render(app.render_ctx)
 
         // Exit app
