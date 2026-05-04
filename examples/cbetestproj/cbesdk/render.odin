@@ -2,6 +2,7 @@ package cbesdk
 
 import "core:fmt"
 import "core:os"
+import "core:mem"
 import "core:math/linalg"
 import sdl "vendor:sdl3"
 
@@ -20,7 +21,7 @@ UBO :: struct {
 create_render_ctx :: proc() -> RenderContext {
     
     ok     := sdl.Init({.VIDEO}); assert(ok, "Failed to initialize SDL3")
-    window := sdl.CreateWindow("Cobalt Engine Game", 1600, 1000, {}); assert(window != nil, "Failed to create window")
+    window := sdl.CreateWindow("Cobalt Engine Game", 800, 500, {}); assert(window != nil, "Failed to create window")
     gpu    := sdl.CreateGPUDevice({.SPIRV}, true, nil); assert(gpu != nil, "Failed to create GPU device")
 
     // This should have been up here a long time ago i wasted so much time
@@ -107,6 +108,15 @@ run_render :: proc(ctx: RenderContext) -> bool {
             usage = {.VERTEX},
             size  = u32(len(vertices) * size_of(Vector3f)),
         })
+        transfer_buf := sdl.CreateGPUTransferBuffer(ctx.gpu, {
+            usage = .UPLOAD,
+            size  = u32(len(vertices) * size_of(Vector3f)),
+        })
+        transfer_mem := sdl.MapGPUTransferBuffer(ctx.gpu, transfer_buf, false)
+        mem.copy(transfer_mem, raw_data(vertices), len(vertices) * size_of(Vector3f))
+        sdl.UnmapGPUTransferBuffer(ctx.gpu, transfer_buf)
+
+        // TODO: do a copy pass to get the data from the transfer buffer on the gpu side and give it to the shader
 
         // Passes
         color_target := sdl.GPUColorTargetInfo {

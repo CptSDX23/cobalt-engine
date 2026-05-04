@@ -21,7 +21,7 @@ UBO :: struct {
 create_render_ctx :: proc() -> RenderContext {
     
     ok     := sdl.Init({.VIDEO}); assert(ok, "Failed to initialize SDL3")
-    window := sdl.CreateWindow("Cobalt Engine Game", 1600, 1000, {}); assert(window != nil, "Failed to create window")
+    window := sdl.CreateWindow("Cobalt Engine Game", 800, 500, {}); assert(window != nil, "Failed to create window")
     gpu    := sdl.CreateGPUDevice({.SPIRV}, true, nil); assert(gpu != nil, "Failed to create GPU device")
 
     // This should have been up here a long time ago i wasted so much time
