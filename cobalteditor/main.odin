@@ -23,15 +23,12 @@ main :: proc() {
     user_proj_dir := strings.trim_space(string(buf[:n]))
     fmt.printfln("Using project folder '%v'", user_proj_dir)
 
-    // Copy SDK to the project folder (windows)
-    copy_cmd := os.Process_Desc{
-        command = []string{"xcopy", CBESDK_DIR, strings.concatenate({user_proj_dir, "\\cbesdk"}), "/E", "/I", "/Y"},
-    }
-    state, stdout, stderr, err_p := os.process_exec(copy_cmd, context.allocator)
-    if err_p != nil {
-        fmt.eprintln("Error copying SDK to project folder:", err_p)
-        return
-    }
+    // Get project settings
+    settings := load_settings_from_proj(user_proj_dir)
+
+    // Build and run project
+    copy_sdk_to_proj(settings.abs_proj_path)
+    compile_proj_shaders(settings)
 
     // Compile all shaders in assets/shaders
     handle, err_so := os.open(strings.concatenate({user_proj_dir, "\\assets\\shaders"}))

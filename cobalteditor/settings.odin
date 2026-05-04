@@ -14,7 +14,7 @@ ProjectSettings :: struct {
     scene_paths:    [dynamic]string,
 }
 
-load_settings_from_file :: proc(proj_path: string) -> ProjectSettings {
+load_settings_from_proj :: proc(proj_path: string) -> ProjectSettings {
 
     // Because some things may be missing
     settings := ProjectSettings {
