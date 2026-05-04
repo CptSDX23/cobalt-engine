@@ -57,10 +57,12 @@ main :: proc() {
         if file_ext == ".frag" || file_ext == ".vert" {
 
             name_stripped := strings.split(info.name, ".")[0]
+            shader_src    := strings.concatenate({"assets\\shaders\\", info.name})
+            shader_out    := strings.concatenate({"target\\assets\\", name_stripped, ".spv", file_ext})
 
             comp_shader_cmd := os.Process_Desc{
                 working_dir = user_proj_dir,
-                command     = []string{"glslc", strings.concatenate({"assets\\shaders\\", info.name}), "-o", strings.concatenate({"target\\", name_stripped, ".spv", file_ext})},
+                command     = []string{"glslc", shader_src, "-o", shader_out},
             }
             state, stdout, stderr, err_p = os.process_exec(comp_shader_cmd, context.allocator)
             if err_p != nil {

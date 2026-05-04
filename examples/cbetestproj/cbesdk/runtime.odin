@@ -3,6 +3,7 @@ package cbesdk
 import "core:fmt"
 import "core:reflect"
 import "core:mem"
+import "core:strings"
 
 Application :: struct {
     scene:      Scene,
@@ -129,7 +130,11 @@ create_application :: proc(registry: TypeRegistry) -> Application {
     return Application {
         scene      = load_scene(registry),
         registry   = registry,
-        render_ctx = create_render_ctx(),
+        render_ctx = create_render_ctx(WindowSettings {
+            name      = strings.clone_to_cstring(strings.concatenate({"Cobalt Engine Game ", current_version()})),
+            size      = {800, 500},
+            clear_col = {0, 0.3, 0.6, 1},
+        }),
     }
 
 }

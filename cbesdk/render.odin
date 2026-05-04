@@ -6,11 +6,19 @@ import "core:mem"
 import "core:math/linalg"
 import sdl "vendor:sdl3"
 
+// Structs
 RenderContext :: struct {
     window:   ^sdl.Window,
     gpu:      ^sdl.GPUDevice,
     pipeline: ^sdl.GPUGraphicsPipeline,
     shaders:  [dynamic]^sdl.GPUShader,
+    settings: WindowSettings,
+}
+
+WindowSettings :: struct {
+    name:      cstring,
+    size:      Vector2i,
+    clear_col: [4]f32,
 }
 
 UBO :: struct {
@@ -18,10 +26,10 @@ UBO :: struct {
 }
 
 // Defaults
-create_render_ctx :: proc() -> RenderContext {
+create_render_ctx :: proc(win_settings: WindowSettings) -> RenderContext {
     
     ok     := sdl.Init({.VIDEO}); assert(ok, "Failed to initialize SDL3")
-    window := sdl.CreateWindow("Cobalt Engine Game", 800, 500, {}); assert(window != nil, "Failed to create window")
+    window := sdl.CreateWindow(win_settings.name, win_settings.size.x, win_settings.size.y, {}); assert(window != nil, "Failed to create window")
     gpu    := sdl.CreateGPUDevice({.SPIRV}, true, nil); assert(gpu != nil, "Failed to create GPU device")
 
     // This should have been up here a long time ago i wasted so much time
@@ -60,6 +68,7 @@ create_render_ctx :: proc() -> RenderContext {
         gpu      = gpu, 
         pipeline = pipeline, 
         shaders  = shaders,
+        settings = win_settings,
     }
 
 }
@@ -122,7 +131,7 @@ run_render :: proc(ctx: RenderContext) -> bool {
         color_target := sdl.GPUColorTargetInfo {
             texture     = swapchain,
             load_op     = .CLEAR,
-            clear_color = {0, 0.3, 0.6, 1},
+            clear_color = sdl.FColor(ctx.settings.clear_col),
             store_op    = .STORE,
         }
         render_pass := sdl.BeginGPURenderPass(cmd_buf, &color_target, 1, nil)
@@ -149,7 +158,7 @@ load_all_shaders :: proc(gpu: ^sdl.GPUDevice, shaders: ^[dynamic]^sdl.GPUShader)
 
     // Hardcoded for now
     // Also doesnt work for now ill figure it out later
-    vert_code, err_v := os.read_entire_file("target/vert_shader.spv.vert", context.allocator)
+    vert_code, err_v := os.read_entire_file("target/assets/vert_shader.spv.vert", context.allocator)
     if err_v != nil {
         fmt.printfln("Failed to load vert shader from compiled file: %v", err_v)
         return
@@ -157,7 +166,7 @@ load_all_shaders :: proc(gpu: ^sdl.GPUDevice, shaders: ^[dynamic]^sdl.GPUShader)
     append(shaders, load_shader(gpu, vert_code, .VERTEX, 1))
 
 
-    frag_code, err_f := os.read_entire_file("target/frag_shader.spv.frag", context.allocator)
+    frag_code, err_f := os.read_entire_file("target/assets/frag_shader.spv.frag", context.allocator)
     if err_f != nil {
         fmt.printfln("Failed to load frag shader from compiled file: %v", err_f)
         return
