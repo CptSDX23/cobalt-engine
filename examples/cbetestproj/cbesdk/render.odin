@@ -5,6 +5,7 @@ import "core:os"
 import "core:mem"
 import "core:math/linalg"
 import sdl "vendor:sdl3"
+import stb "vendor:stb/image"
 
 // Structs
 RenderContext :: struct {
@@ -12,6 +13,7 @@ RenderContext :: struct {
     gpu:      ^sdl.GPUDevice,
     pipeline: ^sdl.GPUGraphicsPipeline,
     shaders:  [dynamic]^sdl.GPUShader,
+    textures: [dynamic]Texture,
     settings: WindowSettings,
 }
 
@@ -24,6 +26,19 @@ WindowSettings :: struct {
 UBO :: struct {
     mvp: matrix[4,4]f32,
 }
+
+VertexData :: struct {
+    pos: Vector3f,
+    col: sdl.FColor,
+}
+
+Texture :: struct {
+    tex:    ^sdl.GPUTexture,
+    pixels: [^]byte,
+    size:   Vector2i,
+}
+
+ROTATION := f32(0)
 
 // Defaults
 create_render_ctx :: proc(win_settings: WindowSettings) -> RenderContext {
@@ -39,6 +54,10 @@ create_render_ctx :: proc(win_settings: WindowSettings) -> RenderContext {
     shaders := make([dynamic]^sdl.GPUShader)
     load_all_shaders(gpu, &shaders)
 
+    // Load images
+    textures := make([dynamic]Texture)
+    append(&textures, load_texture(gpu, "assets/mcStone.png"))
+
     // Shader offsets hardcoded for now
     pipeline := sdl.CreateGPUGraphicsPipeline(gpu, {
         vertex_shader      = shaders[0],
@@ -48,14 +67,15 @@ create_render_ctx :: proc(win_settings: WindowSettings) -> RenderContext {
             num_vertex_buffers         = 1,
             vertex_buffer_descriptions = &sdl.GPUVertexBufferDescription {
                 slot  = 0,
-                pitch = size_of(Vector3f)
+                pitch = size_of(VertexData)
             },
-            num_vertex_attributes = 1,
+            num_vertex_attributes = 2,
             vertex_attributes     = raw_data([]sdl.GPUVertexAttribute {
-                { location = 0, format = .FLOAT3, offset = 0 },
+                { location = 0, format = .FLOAT3, offset = u32(offset_of(VertexData, pos)) },
+                { location = 1, format = .FLOAT4, offset = u32(offset_of(VertexData, col)) },
             }),
         },
-        target_info        = {
+        target_info = {
             num_color_targets         = 1,
             color_target_descriptions = &sdl.GPUColorTargetDescription {
                 format = sdl.GetGPUSwapchainTextureFormat(gpu, window),
@@ -87,6 +107,8 @@ run_render :: proc(ctx: RenderContext) -> bool {
             }
         }
 
+        ROTATION += 1
+
         // Render
         cmd_buf   := sdl.AcquireGPUCommandBuffer(ctx.gpu)
         swapchain :  ^sdl.GPUTexture
@@ -103,31 +125,67 @@ run_render :: proc(ctx: RenderContext) -> bool {
 
         // Z+ is away from the camera i dont want to hear about it
         proj_mat  := linalg.matrix4_perspective_f32(linalg.to_radians(f32(70)), f32(win_size.x) / f32(win_size.y), 0.001, 10000, false)
-        model_mat := create_model_matrix({0, 0, 1}, {0, 45, 0})
+        model_mat := create_model_matrix({0, 0, 3}, {0, ROTATION, 0})
         ubo       := UBO { mvp = proj_mat * model_mat }
 
-        // Create vertex buffer
-        vertices := []Vector3f {
-            {-0.5, -0.5, 0},
-            {   0,  0.5, 0},
-            { 0.5, -0.5, 0},
+        // Create vertex and index buffers
+        vertices := []VertexData {
+            { pos = {-0.5,  0.5, 0}, col = {1, 0, 0, 1} },
+            { pos = { 0.5,  0.5, 0}, col = {0, 1, 0, 1} },
+            { pos = {-0.5, -0.5, 0}, col = {0, 0, 1, 1} },
+            { pos = { 0.5, -0.5, 0}, col = {1, 1, 0, 1} },
+        }
+        indices := []u32 {
+            0, 1, 2,
+            2, 1, 3,
         }
 
         vertex_buf := sdl.CreateGPUBuffer(ctx.gpu, {
             usage = {.VERTEX},
-            size  = u32(len(vertices) * size_of(Vector3f)),
+            size  = u32(get_vert_data_size(vertices)),
+        })
+        index_buf := sdl.CreateGPUBuffer(ctx.gpu, {
+            usage = {.INDEX},
+            size  = u32(get_index_data_size(indices)),
         })
         transfer_buf := sdl.CreateGPUTransferBuffer(ctx.gpu, {
             usage = .UPLOAD,
-            size  = u32(len(vertices) * size_of(Vector3f)),
+            size  = u32(get_vert_data_size(vertices) + get_index_data_size(indices)),
         })
-        transfer_mem := sdl.MapGPUTransferBuffer(ctx.gpu, transfer_buf, false)
-        mem.copy(transfer_mem, raw_data(vertices), len(vertices) * size_of(Vector3f))
+        tex_transfer_buf := sdl.CreateGPUTransferBuffer(ctx.gpu, {
+            usage = .UPLOAD,
+            size  = u32(ctx.textures[0].size.x * ctx.textures[0].size.y * 4),
+        })
+        
+        // Crazy odin shit
+        transfer_mem := transmute([^]byte)sdl.MapGPUTransferBuffer(ctx.gpu, transfer_buf, true)
+        mem.copy(transfer_mem,                                raw_data(vertices), get_vert_data_size(vertices))
+        mem.copy(transfer_mem[get_vert_data_size(vertices):], raw_data(indices), get_index_data_size(indices))
         sdl.UnmapGPUTransferBuffer(ctx.gpu, transfer_buf)
 
-        // TODO: do a copy pass to get the data from the transfer buffer on the gpu side and give it to the shader
+        tex_transfer_mem := sdl.MapGPUTransferBuffer(ctx.gpu, tex_transfer_buf, false)
+        mem.copy(tex_transfer_mem, ctx.textures[0].pixels, int(ctx.textures[0].size.x * ctx.textures[0].size.y * 4))
+        sdl.UnmapGPUTransferBuffer(ctx.gpu, tex_transfer_buf)
 
-        // Passes
+        // Vertex and index copy pass
+        copy_cmd_buf := sdl.AcquireGPUCommandBuffer(ctx.gpu)
+        copy_pass    := sdl.BeginGPUCopyPass(copy_cmd_buf)
+
+        sdl.UploadToGPUBuffer(copy_pass,
+            { transfer_buffer = transfer_buf },
+            { buffer = vertex_buf, size = u32(get_vert_data_size(vertices)) },
+            true,
+        )
+        sdl.UploadToGPUBuffer(copy_pass,
+            { transfer_buffer = transfer_buf, offset = u32(get_vert_data_size(vertices)) },
+            { buffer = index_buf, size = u32(get_index_data_size(indices)) },
+            true,
+        )
+
+        sdl.EndGPUCopyPass(copy_pass)
+        ok = sdl.SubmitGPUCommandBuffer(copy_cmd_buf); assert(ok, "Failed to submit copy buffer")
+
+        // Draw passes
         color_target := sdl.GPUColorTargetInfo {
             texture     = swapchain,
             load_op     = .CLEAR,
@@ -139,8 +197,9 @@ run_render :: proc(ctx: RenderContext) -> bool {
         // Draw commands
         sdl.BindGPUGraphicsPipeline(render_pass, ctx.pipeline)
         sdl.BindGPUVertexBuffers(render_pass, 0, &sdl.GPUBufferBinding { buffer = vertex_buf }, 1)
+        sdl.BindGPUIndexBuffer(render_pass, { buffer = index_buf }, ._32BIT)
         sdl.PushGPUVertexUniformData(cmd_buf, 0, &ubo, size_of(ubo))
-        sdl.DrawGPUPrimitives(render_pass, 3, 1, 0, 0)
+        sdl.DrawGPUIndexedPrimitives(render_pass, 6, 1, 0, 0, 0)
 
         sdl.EndGPURenderPass(render_pass)
 
@@ -157,7 +216,6 @@ run_render :: proc(ctx: RenderContext) -> bool {
 load_all_shaders :: proc(gpu: ^sdl.GPUDevice, shaders: ^[dynamic]^sdl.GPUShader) {
 
     // Hardcoded for now
-    // Also doesnt work for now ill figure it out later
     vert_code, err_v := os.read_entire_file("target/assets/vert_shader.spv.vert", context.allocator)
     if err_v != nil {
         fmt.printfln("Failed to load vert shader from compiled file: %v", err_v)
@@ -188,6 +246,28 @@ load_shader :: proc(gpu: ^sdl.GPUDevice, code: []u8, stage: sdl.GPUShaderStage, 
 
 }
 
+load_texture :: proc(gpu: ^sdl.GPUDevice, path: cstring) -> Texture {
+
+    img_size: [2]i32
+    pixels  := stb.load(path, &img_size.x, &img_size.y, nil, 4); assert(pixels != nil, "Failed to load texture")
+    texture := sdl.CreateGPUTexture(gpu, {
+        type                 = .D2,
+        format               = .R8G8B8A8_UNORM,
+        usage                = {.SAMPLER},
+        width                = u32(img_size.x),
+        height               = u32(img_size.y),
+        layer_count_or_depth = 1,
+        num_levels           = 1,
+    })
+
+    return Texture {
+        tex    = texture,
+        pixels = pixels,
+        size   = img_size,
+    }
+
+}
+
 create_model_matrix :: proc(pos: [3]f32, rot: [3]f32) -> matrix[4,4]f32 {
 
     model_mat: matrix[4,4]f32
@@ -199,4 +279,12 @@ create_model_matrix :: proc(pos: [3]f32, rot: [3]f32) -> matrix[4,4]f32 {
 
     return model_mat
 
+}
+
+get_vert_data_size :: proc(vertices: []VertexData) -> int {
+    return len(vertices) * size_of(VertexData)
+}
+
+get_index_data_size :: proc(indices: []u32) -> int {
+    return len(indices) * size_of(u32)
 }
