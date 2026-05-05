@@ -1,8 +1,5 @@
 package cbesdk
 
-import "core:fmt"
-import "core:reflect"
-import "core:mem"
 import "core:strings"
 
 Application :: struct {
@@ -125,16 +122,14 @@ load_scene :: proc(registry: TypeRegistry) -> Scene {
 }
 
 // Application procedures
-create_application :: proc(registry: TypeRegistry) -> Application {
+create_application :: proc(registry: TypeRegistry, abs_proj_path: string) -> Application {
+
+    settings := load_settings_from_proj(abs_proj_path)
 
     return Application {
         scene      = load_scene(registry),
         registry   = registry,
-        render_ctx = create_render_ctx(WindowSettings {
-            name      = strings.clone_to_cstring(strings.concatenate({"Cobalt Engine Game ", current_version()})),
-            size      = {800, 500},
-            clear_col = {0, 0.3, 0.6, 1},
-        }),
+        render_ctx = create_render_ctx(settings.win_settings),
     }
 
 }

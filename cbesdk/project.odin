@@ -1,14 +1,14 @@
-package cobalteditor
+package cbesdk
 
 import "core:fmt"
 import "core:os"
 import "core:strings"
 import "core:strconv"
-import "../cbesdk"
 
+// Non absolute paths should be relative to /assets
 ProjectSettings :: struct {
     abs_proj_path:  string,
-    win_settings:   cbesdk.WindowSettings,
+    win_settings:   WindowSettings,
     odin_main_path: string,
     shader_paths:   [dynamic]string,
     scene_paths:    [dynamic]string,
@@ -39,27 +39,32 @@ load_settings_from_proj :: proc(proj_path: string) -> ProjectSettings {
             continue
         }
 
-        key   := split[0]
-        value := split[1]
+        key   := strings.trim_space(split[0])
+        value := strings.trim_space(split[1])
 
-        // Possible settings
+        // Possible settings featuring lazy parsing
         if key == "win_name" {
             settings.win_settings.name = strings.clone_to_cstring(value)
         }
         if key == "win_size_x" {
-            settings.win_settings.size.x = i32(strconv.atoi(value))
+            val, ok := strconv.parse_int(value)
+            settings.win_settings.size.x = i32(val)
         }
         if key == "win_size_y" {
-            settings.win_settings.size.y = i32(strconv.atoi(value))
+            val, ok := strconv.parse_int(value)
+            settings.win_settings.size.y = i32(val)
         }
         if key == "win_col_r" {
-            settings.win_settings.clear_col.r = f32(strconv.atof(value))
+            val, ok := strconv.parse_f32(value)
+            settings.win_settings.clear_col.r = val
         }
         if key == "win_col_g" {
-            settings.win_settings.clear_col.g = f32(strconv.atof(value))
+            val, ok := strconv.parse_f32(value)
+            settings.win_settings.clear_col.g = val
         }
         if key == "win_col_b" {
-            settings.win_settings.clear_col.b = f32(strconv.atof(value))
+            val, ok := strconv.parse_f32(value)
+            settings.win_settings.clear_col.b = val
         }
         if key == "odin_main_path" {
             settings.odin_main_path = value
