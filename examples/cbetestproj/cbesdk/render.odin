@@ -30,14 +30,17 @@ UBO :: struct {
 VertexData :: struct {
     pos: Vector3f,
     col: sdl.FColor,
+    uv:  Vector2f,
 }
 
 Texture :: struct {
-    tex:    ^sdl.GPUTexture,
-    pixels: [^]byte,
-    size:   Vector2i,
+    tex:     ^sdl.GPUTexture,
+    sampler: ^sdl.GPUSampler,
+    pixels:  [^]byte,
+    size:    Vector2i,
 }
 
+// Debug
 ROTATION := f32(0)
 
 // Defaults
@@ -56,7 +59,7 @@ create_render_ctx :: proc(win_settings: WindowSettings) -> RenderContext {
 
     // Load images
     textures := make([dynamic]Texture)
-    append(&textures, load_texture(gpu, "assets/mcStone.png"))
+    append(&textures, load_texture(gpu, "target/assets/mcStone.png"))
 
     // Shader offsets hardcoded for now
     pipeline := sdl.CreateGPUGraphicsPipeline(gpu, {
@@ -69,10 +72,11 @@ create_render_ctx :: proc(win_settings: WindowSettings) -> RenderContext {
                 slot  = 0,
                 pitch = size_of(VertexData)
             },
-            num_vertex_attributes = 2,
+            num_vertex_attributes = 3,
             vertex_attributes     = raw_data([]sdl.GPUVertexAttribute {
                 { location = 0, format = .FLOAT3, offset = u32(offset_of(VertexData, pos)) },
                 { location = 1, format = .FLOAT4, offset = u32(offset_of(VertexData, col)) },
+                { location = 2, format = .FLOAT2, offset = u32(offset_of(VertexData, uv)) },
             }),
         },
         target_info = {
@@ -88,6 +92,7 @@ create_render_ctx :: proc(win_settings: WindowSettings) -> RenderContext {
         gpu      = gpu, 
         pipeline = pipeline, 
         shaders  = shaders,
+        textures = textures,
         settings = win_settings,
     }
 
@@ -130,10 +135,10 @@ run_render :: proc(ctx: RenderContext) -> bool {
 
         // Create vertex and index buffers
         vertices := []VertexData {
-            { pos = {-0.5,  0.5, 0}, col = {1, 0, 0, 1} },
-            { pos = { 0.5,  0.5, 0}, col = {0, 1, 0, 1} },
-            { pos = {-0.5, -0.5, 0}, col = {0, 0, 1, 1} },
-            { pos = { 0.5, -0.5, 0}, col = {1, 1, 0, 1} },
+            { pos = {-0.5,  0.5, 0}, col = {1, 0, 0, 1}, uv = {0, 0}, },
+            { pos = { 0.5,  0.5, 0}, col = {0, 1, 0, 1}, uv = {1, 0}, },
+            { pos = {-0.5, -0.5, 0}, col = {0, 0, 1, 1}, uv = {0, 1}, },
+            { pos = { 0.5, -0.5, 0}, col = {1, 1, 0, 1}, uv = {1, 1}, },
         }
         indices := []u32 {
             0, 1, 2,
@@ -158,13 +163,13 @@ run_render :: proc(ctx: RenderContext) -> bool {
         })
         
         // Crazy odin shit
-        transfer_mem := transmute([^]byte)sdl.MapGPUTransferBuffer(ctx.gpu, transfer_buf, true)
+        transfer_mem := transmute([^]byte)sdl.MapGPUTransferBuffer(ctx.gpu, transfer_buf, false)
         mem.copy(transfer_mem,                                raw_data(vertices), get_vert_data_size(vertices))
         mem.copy(transfer_mem[get_vert_data_size(vertices):], raw_data(indices), get_index_data_size(indices))
         sdl.UnmapGPUTransferBuffer(ctx.gpu, transfer_buf)
 
         tex_transfer_mem := sdl.MapGPUTransferBuffer(ctx.gpu, tex_transfer_buf, false)
-        mem.copy(tex_transfer_mem, ctx.textures[0].pixels, int(ctx.textures[0].size.x * ctx.textures[0].size.y * 4))
+        mem.copy(tex_transfer_mem, ctx.textures[0].pixels, get_tex_data_size(ctx.textures[0]))
         sdl.UnmapGPUTransferBuffer(ctx.gpu, tex_transfer_buf)
 
         // Vertex and index copy pass
@@ -174,12 +179,17 @@ run_render :: proc(ctx: RenderContext) -> bool {
         sdl.UploadToGPUBuffer(copy_pass,
             { transfer_buffer = transfer_buf },
             { buffer = vertex_buf, size = u32(get_vert_data_size(vertices)) },
-            true,
+            false,
         )
         sdl.UploadToGPUBuffer(copy_pass,
             { transfer_buffer = transfer_buf, offset = u32(get_vert_data_size(vertices)) },
             { buffer = index_buf, size = u32(get_index_data_size(indices)) },
-            true,
+            false,
+        )
+        sdl.UploadToGPUTexture(copy_pass,
+            { transfer_buffer = tex_transfer_buf },
+            { texture = ctx.textures[0].tex, w = u32(ctx.textures[0].size.x), h = u32(ctx.textures[0].size.y), d = 1 },
+            false,
         )
 
         sdl.EndGPUCopyPass(copy_pass)
@@ -199,6 +209,10 @@ run_render :: proc(ctx: RenderContext) -> bool {
         sdl.BindGPUVertexBuffers(render_pass, 0, &sdl.GPUBufferBinding { buffer = vertex_buf }, 1)
         sdl.BindGPUIndexBuffer(render_pass, { buffer = index_buf }, ._32BIT)
         sdl.PushGPUVertexUniformData(cmd_buf, 0, &ubo, size_of(ubo))
+        sdl.BindGPUFragmentSamplers(render_pass, 0, &sdl.GPUTextureSamplerBinding {
+            texture = ctx.textures[0].tex,
+            sampler = ctx.textures[0].sampler,
+        }, 1)
         sdl.DrawGPUIndexedPrimitives(render_pass, 6, 1, 0, 0, 0)
 
         sdl.EndGPURenderPass(render_pass)
@@ -221,7 +235,7 @@ load_all_shaders :: proc(gpu: ^sdl.GPUDevice, shaders: ^[dynamic]^sdl.GPUShader)
         fmt.printfln("Failed to load vert shader from compiled file: %v", err_v)
         return
     }
-    append(shaders, load_shader(gpu, vert_code, .VERTEX, 1))
+    append(shaders, load_shader(gpu, vert_code, .VERTEX, 1, 0))
 
 
     frag_code, err_f := os.read_entire_file("target/assets/frag_shader.spv.frag", context.allocator)
@@ -229,11 +243,11 @@ load_all_shaders :: proc(gpu: ^sdl.GPUDevice, shaders: ^[dynamic]^sdl.GPUShader)
         fmt.printfln("Failed to load frag shader from compiled file: %v", err_f)
         return
     }
-    append(shaders, load_shader(gpu, frag_code, .FRAGMENT, 0))
+    append(shaders, load_shader(gpu, frag_code, .FRAGMENT, 0, 1))
 
 }
 
-load_shader :: proc(gpu: ^sdl.GPUDevice, code: []u8, stage: sdl.GPUShaderStage, num_ubs: u32) -> ^sdl.GPUShader {
+load_shader :: proc(gpu: ^sdl.GPUDevice, code: []u8, stage: sdl.GPUShaderStage, num_ubs: u32, num_samplers: u32) -> ^sdl.GPUShader {
 
     return sdl.CreateGPUShader(gpu, {
         code_size           = len(code),
@@ -241,7 +255,8 @@ load_shader :: proc(gpu: ^sdl.GPUDevice, code: []u8, stage: sdl.GPUShaderStage, 
         entrypoint          = "main",
         format              = {.SPIRV},
         stage               = stage,
-        num_uniform_buffers = num_ubs
+        num_uniform_buffers = num_ubs,
+        num_samplers        = num_samplers,
     })
 
 }
@@ -259,11 +274,13 @@ load_texture :: proc(gpu: ^sdl.GPUDevice, path: cstring) -> Texture {
         layer_count_or_depth = 1,
         num_levels           = 1,
     })
+    sampler := sdl.CreateGPUSampler(gpu, {})
 
     return Texture {
-        tex    = texture,
-        pixels = pixels,
-        size   = img_size,
+        tex     = texture,
+        sampler = sampler,
+        pixels  = pixels,
+        size    = img_size,
     }
 
 }
@@ -287,4 +304,8 @@ get_vert_data_size :: proc(vertices: []VertexData) -> int {
 
 get_index_data_size :: proc(indices: []u32) -> int {
     return len(indices) * size_of(u32)
+}
+
+get_tex_data_size :: proc(texture: Texture) -> int {
+    return int(texture.size.x * texture.size.y * 4)
 }
