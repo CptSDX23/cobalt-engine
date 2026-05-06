@@ -141,10 +141,10 @@ run_application :: proc(app: Application) {
     loop: for {
 
         // update_scene(app.scene)
-        res := run_render(app.render_ctx)
+        quit := run_render(app.render_ctx)
 
         // Exit app
-        if res {
+        if quit {
             break loop
         }
 

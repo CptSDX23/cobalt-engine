@@ -14,6 +14,7 @@ RenderContext :: struct {
     pipeline: ^sdl.GPUGraphicsPipeline,
     shaders:  [dynamic]^sdl.GPUShader,
     textures: [dynamic]Texture,
+    models:   [dynamic]Model,
     settings: WindowSettings,
 }
 
@@ -59,7 +60,11 @@ create_render_ctx :: proc(win_settings: WindowSettings) -> RenderContext {
 
     // Load images
     textures := make([dynamic]Texture)
-    append(&textures, load_texture(gpu, "target/assets/mcStone.png"))
+    append(&textures, load_texture(gpu, "target/assets/fries.png"))
+
+    // Load models
+    models := make([dynamic]Model)
+    //append(&models, load_obj("target/assets/quad.obj"))
 
     // Shader offsets hardcoded for now
     pipeline := sdl.CreateGPUGraphicsPipeline(gpu, {
@@ -93,6 +98,7 @@ create_render_ctx :: proc(win_settings: WindowSettings) -> RenderContext {
         pipeline = pipeline, 
         shaders  = shaders,
         textures = textures,
+        models   = models,
         settings = win_settings,
     }
 
@@ -144,6 +150,11 @@ run_render :: proc(ctx: RenderContext) -> bool {
             0, 1, 2,
             2, 1, 3,
         }
+
+        //vertices2 := ctx.models[0].verts[:]
+        //indices2  := ctx.models[0].indices[:]
+
+        fmt.println(vertices)
 
         vertex_buf := sdl.CreateGPUBuffer(ctx.gpu, {
             usage = {.VERTEX},
