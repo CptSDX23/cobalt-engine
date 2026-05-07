@@ -9,13 +9,14 @@ import stb "vendor:stb/image"
 
 // Structs
 RenderContext :: struct {
-    window:   ^sdl.Window,
-    gpu:      ^sdl.GPUDevice,
-    pipeline: ^sdl.GPUGraphicsPipeline,
-    shaders:  [dynamic]^sdl.GPUShader,
-    textures: [dynamic]Texture,
-    models:   [dynamic]Model,
-    settings: WindowSettings,
+    window:    ^sdl.Window,
+    gpu:       ^sdl.GPUDevice,
+    pipeline:  ^sdl.GPUGraphicsPipeline,
+    depth_tex: ^sdl.GPUTexture,
+    shaders:   [dynamic]^sdl.GPUShader,
+    textures:  [dynamic]Texture,
+    models:    [dynamic]Model,
+    settings:  WindowSettings,
 }
 
 WindowSettings :: struct {
@@ -60,11 +61,24 @@ create_render_ctx :: proc(win_settings: WindowSettings) -> RenderContext {
 
     // Load images
     textures := make([dynamic]Texture)
-    append(&textures, load_texture(gpu, "target/assets/fries.png"))
+    append(&textures, load_texture(gpu, "target/assets/fries.png", 1))
 
     // Load models
     models := make([dynamic]Model)
-    append(&models, load_obj("target/assets/quad.obj"))
+    append(&models, load_obj("target/assets/teapot.obj"))
+
+    // Create depth texture
+    win_size: [2]i32
+    ok = sdl.GetWindowSize(window, &win_size.x, &win_size.y); assert(ok, "Failed to get window size for depth texture")
+    depth_tex := sdl.CreateGPUTexture(gpu, {
+        type                 = .D2,
+        format               = .D24_UNORM,
+        usage                = {.DEPTH_STENCIL_TARGET},
+        width                = u32(win_size.x),
+        height               = u32(win_size.y),
+        layer_count_or_depth = 1,
+        num_levels           = 1,
+    })
 
     // Shader offsets hardcoded for now
     pipeline := sdl.CreateGPUGraphicsPipeline(gpu, {
@@ -86,20 +100,28 @@ create_render_ctx :: proc(win_settings: WindowSettings) -> RenderContext {
         },
         target_info = {
             num_color_targets         = 1,
+            has_depth_stencil_target  = true,
+            depth_stencil_format      = .D24_UNORM,
             color_target_descriptions = &sdl.GPUColorTargetDescription {
                 format = sdl.GetGPUSwapchainTextureFormat(gpu, window),
             },
         },
+        depth_stencil_state = {
+            enable_depth_test  = true,
+            enable_depth_write = true,
+            compare_op         = .LESS,
+        },
     })
 
     return RenderContext { 
-        window   = window, 
-        gpu      = gpu, 
-        pipeline = pipeline, 
-        shaders  = shaders,
-        textures = textures,
-        models   = models,
-        settings = win_settings,
+        window    = window, 
+        gpu       = gpu, 
+        pipeline  = pipeline, 
+        depth_tex = depth_tex,
+        shaders   = shaders,
+        textures  = textures,
+        models    = models,
+        settings  = win_settings,
     }
 
 }
@@ -136,32 +158,11 @@ run_render :: proc(ctx: RenderContext) -> bool {
 
         // Z+ is away from the camera i dont want to hear about it
         proj_mat  := linalg.matrix4_perspective_f32(linalg.to_radians(f32(70)), f32(win_size.x) / f32(win_size.y), 0.001, 10000, false)
-        model_mat := create_model_matrix({0, 0, 3}, {0, ROTATION, 0})
+        model_mat := create_model_matrix({0, 0, 25}, {0, ROTATION, 0})
         ubo       := UBO { mvp = proj_mat * model_mat }
-
-        // Create vertex and index buffers
-        // vertices := []VertexData {
-        //     { pos = {-0.5,  0.5, 0.5}, col = {1, 0, 0, 1}, uv = {0, 0}, },
-        //     { pos = { 0.5,  0.5, 0.5}, col = {0, 1, 0, 1}, uv = {1, 0}, },
-        //     { pos = {-0.5, -0.5, 0.5}, col = {0, 0, 1, 1}, uv = {0, 1}, },
-        //     // { pos = { 0.5, -0.5, 0.5}, col = {1, 1, 0, 1}, uv = {1, 1}, },
-        //     // { pos = {-0.5,  0.5, -0.5}, col = {1, 0, 0, 1}, uv = {0, 0}, },
-        //     // { pos = { 0.5,  0.5, -0.5}, col = {0, 1, 0, 1}, uv = {1, 0}, },
-        //     // { pos = {-0.5, -0.5, -0.5}, col = {0, 0, 1, 1}, uv = {0, 1}, },
-        //     // { pos = { 0.5, -0.5, -0.5}, col = {1, 1, 0, 1}, uv = {1, 1}, },
-        // }
-        // indices := []u32 {
-        //     0, 1, 2,
-        //     // 2, 1, 3,
-        //     // 4, 5, 6,
-        //     // 6, 5, 7,
-        // }
 
         vertices := ctx.models[0].verts[:]
         indices  := ctx.models[0].indices[:]
-
-        // fmt.println("V: ", vertices)
-        // fmt.println("I: ", indices)
 
         vertex_buf := sdl.CreateGPUBuffer(ctx.gpu, {
             usage = {.VERTEX},
@@ -177,7 +178,7 @@ run_render :: proc(ctx: RenderContext) -> bool {
         })
         tex_transfer_buf := sdl.CreateGPUTransferBuffer(ctx.gpu, {
             usage = .UPLOAD,
-            size  = u32(ctx.textures[0].size.x * ctx.textures[0].size.y * 4),
+            size  = u32(get_tex_data_size(ctx.textures[0])),
         })
         
         // Crazy odin shit
@@ -220,7 +221,13 @@ run_render :: proc(ctx: RenderContext) -> bool {
             clear_color = sdl.FColor(ctx.settings.clear_col),
             store_op    = .STORE,
         }
-        render_pass := sdl.BeginGPURenderPass(cmd_buf, &color_target, 1, nil)
+        depth_target := sdl.GPUDepthStencilTargetInfo {
+            texture     = ctx.depth_tex,
+            load_op     = .CLEAR,
+            clear_depth = 1,
+            store_op    = .DONT_CARE,
+        }
+        render_pass := sdl.BeginGPURenderPass(cmd_buf, &color_target, 1, &depth_target)
 
         // Draw commands
         sdl.BindGPUGraphicsPipeline(render_pass, ctx.pipeline)
@@ -279,9 +286,10 @@ load_shader :: proc(gpu: ^sdl.GPUDevice, code: []u8, stage: sdl.GPUShaderStage, 
 
 }
 
-load_texture :: proc(gpu: ^sdl.GPUDevice, path: cstring) -> Texture {
+load_texture :: proc(gpu: ^sdl.GPUDevice, path: cstring, flip: i32) -> Texture {
 
     img_size: [2]i32
+    stb.set_flip_vertically_on_load(flip)
     pixels  := stb.load(path, &img_size.x, &img_size.y, nil, 4); //assert(pixels != nil, "Failed to load texture")
     if (pixels == nil) {
         fmt.println("Bad")

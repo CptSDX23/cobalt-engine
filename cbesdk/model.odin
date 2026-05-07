@@ -69,8 +69,6 @@ load_obj :: proc(path: string) -> Model {
 
     for index, i in face_indices {
 
-        fmt.println(index)
-
         for j in 0..<3 {
             append(&final_verts, VertexData {
                 pos = vert_poses[index.poses[j]],
