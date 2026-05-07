@@ -16,6 +16,7 @@ RenderContext :: struct {
     shaders:   [dynamic]^sdl.GPUShader,
     textures:  [dynamic]Texture,
     models:    [dynamic]Model,
+    camera:    RenderCamera,
     settings:  WindowSettings,
 }
 
@@ -42,6 +43,13 @@ Texture :: struct {
     size:    Vector2i,
 }
 
+RenderCamera :: struct {
+    position:       Vector3f,
+    rotation:       Vector3f,
+    fov:            f32,
+    cliping_planes: Vector2f,
+}
+
 // Debug
 ROTATION := f32(0)
 
@@ -66,6 +74,14 @@ create_render_ctx :: proc(win_settings: WindowSettings) -> RenderContext {
     // Load models
     models := make([dynamic]Model)
     append(&models, load_obj("target/assets/teapot.obj"))
+
+    // Camera
+    cam := RenderCamera {
+        position       = {0, 0, 0},
+        rotation       = {0, 0, 0},
+        fov            = 70,
+        cliping_planes = {0.001, 10000}
+    }
 
     // Create depth texture
     win_size: [2]i32
@@ -121,6 +137,7 @@ create_render_ctx :: proc(win_settings: WindowSettings) -> RenderContext {
         shaders   = shaders,
         textures  = textures,
         models    = models,
+        camera    = cam,
         settings  = win_settings,
     }
 
@@ -157,9 +174,10 @@ run_render :: proc(ctx: RenderContext) -> bool {
         ok = sdl.GetWindowSize(ctx.window, &win_size.x, &win_size.y); assert(ok, "Failed to get window size for projection matrix")
 
         // Z+ is away from the camera i dont want to hear about it
-        proj_mat  := linalg.matrix4_perspective_f32(linalg.to_radians(f32(70)), f32(win_size.x) / f32(win_size.y), 0.001, 10000, false)
-        model_mat := create_model_matrix({0, 0, 25}, {0, ROTATION, 0})
-        ubo       := UBO { mvp = proj_mat * model_mat }
+        proj_mat  := linalg.matrix4_perspective_f32(linalg.to_radians(ctx.camera.fov), f32(win_size.x) / f32(win_size.y), ctx.camera.cliping_planes.x, ctx.camera.cliping_planes.y, false)
+        view_mat  := create_transform_matrix(ctx.camera.position, ctx.camera.rotation, true)
+        model_mat := create_transform_matrix({0, 0, 25}, {0, ROTATION, 0}, false)
+        ubo       := UBO { mvp = proj_mat * view_mat * model_mat }
 
         vertices := ctx.models[0].verts[:]
         indices  := ctx.models[0].indices[:]
@@ -314,16 +332,27 @@ load_texture :: proc(gpu: ^sdl.GPUDevice, path: cstring, flip: i32) -> Texture {
 
 }
 
-create_model_matrix :: proc(pos: [3]f32, rot: [3]f32) -> matrix[4,4]f32 {
+create_transform_matrix :: proc(pos: [3]f32, rot: [3]f32, flip: bool) -> matrix[4,4]f32 {
 
-    model_mat: matrix[4,4]f32
+    transform_mat: matrix[4,4]f32
 
-    model_mat = linalg.matrix4_translate_f32(pos)
-    model_mat = model_mat * linalg.matrix4_rotate_f32(linalg.to_radians(rot.x), {1, 0, 0})
-    model_mat = model_mat * linalg.matrix4_rotate_f32(linalg.to_radians(rot.y), {0, 1, 0})
-    model_mat = model_mat * linalg.matrix4_rotate_f32(linalg.to_radians(rot.z), {0, 0, 1})
+    if (!flip) {
 
-    return model_mat
+        transform_mat = linalg.matrix4_translate_f32(pos)
+        transform_mat = transform_mat * linalg.matrix4_rotate_f32(linalg.to_radians(rot.x), {1, 0, 0})
+        transform_mat = transform_mat * linalg.matrix4_rotate_f32(linalg.to_radians(rot.y), {0, 1, 0})
+        transform_mat = transform_mat * linalg.matrix4_rotate_f32(linalg.to_radians(rot.z), {0, 0, 1})
+
+    } else {
+
+        transform_mat = linalg.matrix4_translate_f32(-pos)
+        transform_mat = transform_mat * linalg.matrix4_rotate_f32(-linalg.to_radians(rot.x), {1, 0, 0})
+        transform_mat = transform_mat * linalg.matrix4_rotate_f32(-linalg.to_radians(rot.y), {0, 1, 0})
+        transform_mat = transform_mat * linalg.matrix4_rotate_f32(-linalg.to_radians(rot.z), {0, 0, 1})
+
+    }
+
+    return transform_mat
 
 }
 
@@ -337,4 +366,11 @@ get_index_data_size :: proc(indices: []u32) -> int {
 
 get_tex_data_size :: proc(texture: Texture) -> int {
     return int(texture.size.x * texture.size.y * 4)
+}
+
+// Integration with scripting
+set_render_camera :: proc(render_ctx: ^RenderContext, render_cam: RenderCamera) {
+
+    render_ctx.camera = render_cam;
+
 }

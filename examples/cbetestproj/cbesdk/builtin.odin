@@ -11,3 +11,26 @@ Transform :: struct {
     rotation: Vector3f,
     scale:    Vector3f,
 }
+
+Camera :: struct {
+    fov:        f32,
+    near_plane: f32,
+    far_plane:  f32,
+    is_main:    bool,
+}
+
+cam_system := System {
+
+    name   = "CameraSystem",
+    update = proc(scene: Scene, deltaTime: f32) {
+
+        matches, indices := query_scene_components(scene, Camera)
+        for cam, i in matches {
+            if cam.is_main {
+                
+            }
+        }
+
+    }
+
+}

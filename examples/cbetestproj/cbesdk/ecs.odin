@@ -24,6 +24,13 @@ System :: struct {
     update: proc(scene: Scene, deltaTime: f32)
 }
 
+// Special system that gets the Application as well
+AppSystem :: struct {
+    name:   string,
+    start:  proc(scene: Scene, app: Application),
+    update: proc(scene: Scene, app: Application, deltaTime: f32)
+}
+
 // Mostly for uuid gen
 create_entity :: proc(name: string) -> Entity {
 
@@ -51,16 +58,6 @@ create_component :: proc(data: any) -> Component {
         name        = name,
         enabled     = true,
         data        = data,
-    }
-
-}
-
-create_system :: proc(name: string, update: proc(scene: Scene, deltaTime: f32)) -> System {
-
-    // Name cant be infered here
-    return System {
-        name   = name,
-        update = update,
     }
 
 }

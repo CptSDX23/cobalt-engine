@@ -1,7 +1,5 @@
 package cbesdk
 
-import "core:strings"
-
 Application :: struct {
     scene:      Scene,
     registry:   TypeRegistry,
@@ -53,6 +51,38 @@ query_scene_components :: proc(scene: Scene, $T: typeid) -> ([dynamic]T, [dynami
     }
 
     return matches, indices
+
+}
+
+// Returns an array of entity uuids of components
+query_component_uuids :: proc(scene: Scene, $T: typeid) -> [dynamic]i128 {
+
+    uuids := make([dynamic]i128)
+
+    // If the cast works, its the type wanted
+    for component, i in scene.components {
+        if v, ok := component.data.(T); ok {
+            append(&uuids, component.entity_uuid)
+        }
+    }
+
+    return uuids
+
+}
+
+// Returns the component matching the entity uuid
+query_entity_component :: proc(scene: Scene, $T: typeid, uuid: i128) -> T {
+
+    match: T
+
+    // If the cast works, its the type wanted
+    for component, i in scene.components {
+        if v, ok := component.data.(T); ok {
+            match = v
+        }
+    }
+
+    return match
 
 }
 

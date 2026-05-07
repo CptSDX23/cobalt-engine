@@ -1,7 +1,5 @@
 package cbesdk
 
-import "core:strings"
-
 Application :: struct {
     scene:      Scene,
     registry:   TypeRegistry,
