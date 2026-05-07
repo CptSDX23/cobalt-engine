@@ -12,25 +12,28 @@ Model :: struct {
     indices: []u32,
 }
 
+FaceIndex :: struct {
+    poses: [3]u32,
+    uvs:   [3]u32,
+}
+
 load_obj :: proc(path: string) -> Model {
 
-    model      := Model {}
-    vert_poses := make([dynamic]Vector3f)
-    vert_cols  := make([dynamic]sdl.FColor)
-    vert_uvs   := make([dynamic]Vector2f)
-    face_poses := make([dynamic]u32)
-    face_uvs   := make([dynamic]u32)
+    model        := Model {}
+    vert_poses   := make([dynamic]Vector3f)
+    vert_cols    := make([dynamic]sdl.FColor)
+    vert_uvs     := make([dynamic]Vector2f)
+    face_indices := make([dynamic]FaceIndex)
     defer delete(vert_poses)
     defer delete(vert_cols)
     defer delete(vert_uvs)
-    defer delete(face_poses)
-    defer delete(face_uvs)
+    defer delete(face_indices)
 
     // Read file
     data, err := os.read_entire_file(path, context.allocator)
     
     if err != nil {
-        fmt.println("Failed to read project settings file")
+        fmt.println("Failed to read obj file")
         return model
     }
 
@@ -38,7 +41,8 @@ load_obj :: proc(path: string) -> Model {
     lines := string(data)
 	for line in strings.split_lines_iterator(&lines) {
 
-        parts := strings.split(line, " ")
+        // Because splitting is just wrong for some reason?
+        parts := strings.fields(line)
         if (len(parts) < 1) {
             continue
         }
@@ -50,26 +54,37 @@ load_obj :: proc(path: string) -> Model {
             case "vt":
                 append(&vert_uvs, parse_vert_uv(parts))
             case "f":
-                append_elems(&face_poses, ..parse_face_pos(parts))
-                append_elems(&face_uvs, ..parse_face_uv(parts))
+                // append_elems(&face_poses, ..parse_face_pos(parts))
+                // append_elems(&face_uvs, ..parse_face_uv(parts))
+                append(&face_indices, parse_face_index(parts))
 
         }
 
     }
 
     // Because .obj is actually a stupid format, create new vertices
-    model.verts   = make([]VertexData, len(face_poses) * 3)
-    model.indices = make([]u32, len(face_poses) * 3)
+    // Also this entire routine is scuffed my bad
+    final_verts   := make([dynamic]VertexData)
+    final_indices := make([dynamic]u32)
 
-    for face, i in face_poses {
+    for index, i in face_indices {
 
-        model.verts[i] = VertexData {
-            pos = vert_poses[face_poses[i]],
-            col = {1, 1, 1, 1},
-            uv  = vert_uvs[face_uvs[i]],
+        fmt.println(index)
+
+        for j in 0..<3 {
+            append(&final_verts, VertexData {
+                pos = vert_poses[index.poses[j]],
+                col = {1, 1, 1, 1},
+                uv  = vert_uvs[index.uvs[j]],
+            })
+            append(&final_indices, u32(i * 3 + j))
         }
-        model.indices[i] = u32(i)
 
+    }
+
+    model = Model {
+        verts   = final_verts[:],
+        indices = final_indices[:],
     }
 
     return model
@@ -79,7 +94,7 @@ load_obj :: proc(path: string) -> Model {
 // Parsers
 parse_vert_pos :: proc(parts: []string) -> Vector3f {
 
-    if (len(parts) != 4) {
+    if (len(parts) < 4) {
         return {0, 0, 0}
     }
 
@@ -96,7 +111,7 @@ parse_vert_pos :: proc(parts: []string) -> Vector3f {
 
 parse_vert_uv :: proc(parts: []string) -> Vector2f {
 
-    if (len(parts) != 3) {
+    if (len(parts) < 3) {
         return {0, 0}
     }
 
@@ -109,30 +124,37 @@ parse_vert_uv :: proc(parts: []string) -> Vector2f {
 
 }
 
-parse_face_pos :: proc(parts: []string) -> []u32 {
+parse_face_index :: proc(parts: []string) -> FaceIndex {
 
-    poses := []u32{0, 0, 0}
+    index := FaceIndex {}
+    poses := [3]u32{0, 0, 0}
+    uvs   := [3]u32{0, 0, 0}
 
     if (len(parts) != 4) {
-        return poses
+        return index
     }
 
     for i in 1..=3 {
         indices := strings.split(parts[i], "/")
-        if (len(indices) < 1) {
-            return poses
+        if (len(indices) < 2) {
+            return index
         }
         val, ok := strconv.parse_uint(indices[0])
         poses[i - 1] = u32(val) - 1
+        val, ok = strconv.parse_uint(indices[1])
+        uvs[i - 1] = u32(val) - 1
     }
 
-    return poses
+    index.poses = poses
+    index.uvs   = uvs
+
+    return index
 
 }
 
 parse_face_uv :: proc(parts: []string) -> []u32 {
 
-    uvs := []u32{0, 0}
+    uvs := []u32{0, 0, 0}
 
     if (len(parts) != 4) {
         return uvs
@@ -144,7 +166,7 @@ parse_face_uv :: proc(parts: []string) -> []u32 {
             return uvs
         }
         val, ok := strconv.parse_uint(indices[1])
-        uvs[i - 1] = u32(val)
+        uvs[i - 1] = u32(val) - 1
     }
 
     return uvs

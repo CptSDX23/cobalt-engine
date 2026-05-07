@@ -63,26 +63,18 @@ build_and_run_proj :: proc(settings: cbesdk.ProjectSettings) {
     abs_proj_path   := settings.abs_proj_path
 
     // Build and run user program
-    file, err := os.open(strings.concatenate({settings.abs_proj_path, "\\target\\output.txt"}), os.O_WRONLY | os.O_CREATE | os.O_TRUNC)
-    if (err != nil) {
-        fmt.println("ASDFSD")
-        fmt.println(err)
-    }
     build_cmd := os.Process_Desc{
         working_dir = settings.abs_proj_path,
         command     = []string{"odin", "run", main_path, collection_path, out_path, "--", abs_proj_path},
-        stdout      = file
     }
-    process, err_p := os.process_start(build_cmd)
+    state, stdout, stderr, err_p := os.process_exec(build_cmd, context.allocator)
     if err_p != nil {
         fmt.eprintln("Error building project:", err_p)
         return
     }
 
-    state, wait_err := os.process_wait(process)
-
     // This can get quite long if the app runs for a while,
     // should redirect this somewhere else soon
-    // fmt.print(string(stdout))
+    fmt.print(string(stdout))
 
 }

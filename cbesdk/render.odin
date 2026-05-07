@@ -64,7 +64,7 @@ create_render_ctx :: proc(win_settings: WindowSettings) -> RenderContext {
 
     // Load models
     models := make([dynamic]Model)
-    //append(&models, load_obj("target/assets/quad.obj"))
+    append(&models, load_obj("target/assets/quad.obj"))
 
     // Shader offsets hardcoded for now
     pipeline := sdl.CreateGPUGraphicsPipeline(gpu, {
@@ -140,21 +140,28 @@ run_render :: proc(ctx: RenderContext) -> bool {
         ubo       := UBO { mvp = proj_mat * model_mat }
 
         // Create vertex and index buffers
-        vertices := []VertexData {
-            { pos = {-0.5,  0.5, 0}, col = {1, 0, 0, 1}, uv = {0, 0}, },
-            { pos = { 0.5,  0.5, 0}, col = {0, 1, 0, 1}, uv = {1, 0}, },
-            { pos = {-0.5, -0.5, 0}, col = {0, 0, 1, 1}, uv = {0, 1}, },
-            { pos = { 0.5, -0.5, 0}, col = {1, 1, 0, 1}, uv = {1, 1}, },
-        }
-        indices := []u32 {
-            0, 1, 2,
-            2, 1, 3,
-        }
+        // vertices := []VertexData {
+        //     { pos = {-0.5,  0.5, 0.5}, col = {1, 0, 0, 1}, uv = {0, 0}, },
+        //     { pos = { 0.5,  0.5, 0.5}, col = {0, 1, 0, 1}, uv = {1, 0}, },
+        //     { pos = {-0.5, -0.5, 0.5}, col = {0, 0, 1, 1}, uv = {0, 1}, },
+        //     // { pos = { 0.5, -0.5, 0.5}, col = {1, 1, 0, 1}, uv = {1, 1}, },
+        //     // { pos = {-0.5,  0.5, -0.5}, col = {1, 0, 0, 1}, uv = {0, 0}, },
+        //     // { pos = { 0.5,  0.5, -0.5}, col = {0, 1, 0, 1}, uv = {1, 0}, },
+        //     // { pos = {-0.5, -0.5, -0.5}, col = {0, 0, 1, 1}, uv = {0, 1}, },
+        //     // { pos = { 0.5, -0.5, -0.5}, col = {1, 1, 0, 1}, uv = {1, 1}, },
+        // }
+        // indices := []u32 {
+        //     0, 1, 2,
+        //     // 2, 1, 3,
+        //     // 4, 5, 6,
+        //     // 6, 5, 7,
+        // }
 
-        //vertices2 := ctx.models[0].verts[:]
-        //indices2  := ctx.models[0].indices[:]
+        vertices := ctx.models[0].verts[:]
+        indices  := ctx.models[0].indices[:]
 
-        fmt.println(vertices)
+        // fmt.println("V: ", vertices)
+        // fmt.println("I: ", indices)
 
         vertex_buf := sdl.CreateGPUBuffer(ctx.gpu, {
             usage = {.VERTEX},
@@ -224,7 +231,7 @@ run_render :: proc(ctx: RenderContext) -> bool {
             texture = ctx.textures[0].tex,
             sampler = ctx.textures[0].sampler,
         }, 1)
-        sdl.DrawGPUIndexedPrimitives(render_pass, 6, 1, 0, 0, 0)
+        sdl.DrawGPUIndexedPrimitives(render_pass, u32(len(vertices)), 1, 0, 0, 0)
 
         sdl.EndGPURenderPass(render_pass)
 
@@ -275,7 +282,10 @@ load_shader :: proc(gpu: ^sdl.GPUDevice, code: []u8, stage: sdl.GPUShaderStage, 
 load_texture :: proc(gpu: ^sdl.GPUDevice, path: cstring) -> Texture {
 
     img_size: [2]i32
-    pixels  := stb.load(path, &img_size.x, &img_size.y, nil, 4); assert(pixels != nil, "Failed to load texture")
+    pixels  := stb.load(path, &img_size.x, &img_size.y, nil, 4); //assert(pixels != nil, "Failed to load texture")
+    if (pixels == nil) {
+        fmt.println("Bad")
+    }
     texture := sdl.CreateGPUTexture(gpu, {
         type                 = .D2,
         format               = .R8G8B8A8_UNORM,
