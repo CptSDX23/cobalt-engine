@@ -7,12 +7,13 @@ import "core:reflect"
 // Constructors for components, structs for systems
 TypeRegistry :: struct {
     components:   map[string]typeid,
-    constructors: map[string]proc(args: [dynamic]any) -> any,
+    constructors: map[string]proc(args: [dynamic]string) -> any,
     systems:      map[string]System,
+    app_systems:  map[string]AppSystem,
 }
 
 // Registry procedures
-register_component_data :: proc(registry: ^TypeRegistry, $T: typeid, constructor: proc(args: [dynamic]any) -> any) {
+register_component_data :: proc(registry: ^TypeRegistry, $T: typeid, constructor: proc(args: [dynamic]string) -> any) {
 
     // Try to get the name of the struct through reflection
     info := type_info_of(T)
@@ -28,6 +29,10 @@ register_component_data :: proc(registry: ^TypeRegistry, $T: typeid, constructor
 
 register_system :: proc(registry: ^TypeRegistry, system: System) {
     registry.systems[system.name] = system
+}
+
+register_app_system :: proc(registry: ^TypeRegistry, system: AppSystem) {
+    registry.app_systems[system.name] = system
 }
 
 create_registry :: proc() -> TypeRegistry {
@@ -49,6 +54,11 @@ print_registry :: proc(registry: TypeRegistry) {
 
     fmt.println("Registry Systems:")
     for system in registry.systems {
+        fmt.println(system)
+    }
+
+    fmt.println("Registry App Systems:")
+    for system in registry.app_systems {
         fmt.println(system)
     }
 

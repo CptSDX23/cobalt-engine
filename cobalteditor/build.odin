@@ -75,6 +75,7 @@ build_and_run_proj :: proc(settings: cbesdk.ProjectSettings) {
 
     // This can get quite long if the app runs for a while,
     // should redirect this somewhere else soon
+    fmt.print(string(stderr))
     fmt.print(string(stdout))
 
 }

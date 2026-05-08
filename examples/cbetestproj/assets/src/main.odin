@@ -1,5 +1,6 @@
 package cbetestproj
 
+import "core:fmt"
 import "core:os"
 import "cobalt:cbesdk"
 
@@ -11,7 +12,7 @@ main :: proc() {
     cbesdk.register_system(&registry, test_system)
 
     // Start application
-    app := cbesdk.create_application(registry, os.args[1])
-    cbesdk.run_application(app)
+    app := cbesdk.create_application(&registry, os.args[1])
+    cbesdk.run_application(&app)
 
 }

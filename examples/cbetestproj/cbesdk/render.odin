@@ -44,10 +44,10 @@ Texture :: struct {
 }
 
 RenderCamera :: struct {
-    position:       Vector3f,
-    rotation:       Vector3f,
-    fov:            f32,
-    cliping_planes: Vector2f,
+    position:        Vector3f,
+    rotation:        Vector3f,
+    fov:             f32,
+    clipping_planes: Vector2f,
 }
 
 // Debug
@@ -77,10 +77,10 @@ create_render_ctx :: proc(win_settings: WindowSettings) -> RenderContext {
 
     // Camera
     cam := RenderCamera {
-        position       = {0, 0, 0},
-        rotation       = {0, 0, 0},
-        fov            = 70,
-        cliping_planes = {0.001, 10000}
+        position        = {0, 0, 0},
+        rotation        = {0, 0, 0},
+        fov             = 70,
+        clipping_planes = {0.001, 10000}
     }
 
     // Create depth texture
@@ -144,9 +144,7 @@ create_render_ctx :: proc(win_settings: WindowSettings) -> RenderContext {
 }
 
 // The boolean indicates whether the application should exit
-run_render :: proc(ctx: RenderContext) -> bool {
-
-    loop: for {
+run_render :: proc(ctx: RenderContext, input: ^InputState) -> bool {
 
         // Events
         event: sdl.Event
@@ -154,10 +152,16 @@ run_render :: proc(ctx: RenderContext) -> bool {
             #partial switch event.type {
                 case .QUIT:
                     return true
+                case .KEY_DOWN:
+                    //input.key_pressed[event.key.scancode] = true
+                    set_key_down(input, event.key.scancode)
+                case .KEY_UP:
+                    //input.key_pressed[event.key.scancode] = false
+                    set_key_up(input, event.key.scancode)
             }
         }
 
-        ROTATION += 1
+        // ROTATION += 1
 
         // Render
         cmd_buf   := sdl.AcquireGPUCommandBuffer(ctx.gpu)
@@ -174,7 +178,7 @@ run_render :: proc(ctx: RenderContext) -> bool {
         ok = sdl.GetWindowSize(ctx.window, &win_size.x, &win_size.y); assert(ok, "Failed to get window size for projection matrix")
 
         // Z+ is away from the camera i dont want to hear about it
-        proj_mat  := linalg.matrix4_perspective_f32(linalg.to_radians(ctx.camera.fov), f32(win_size.x) / f32(win_size.y), ctx.camera.cliping_planes.x, ctx.camera.cliping_planes.y, false)
+        proj_mat  := linalg.matrix4_perspective_f32(linalg.to_radians(ctx.camera.fov), f32(win_size.x) / f32(win_size.y), ctx.camera.clipping_planes.x, ctx.camera.clipping_planes.y, false)
         view_mat  := create_transform_matrix(ctx.camera.position, ctx.camera.rotation, true)
         model_mat := create_transform_matrix({0, 0, 25}, {0, ROTATION, 0}, false)
         ubo       := UBO { mvp = proj_mat * view_mat * model_mat }
@@ -264,8 +268,6 @@ run_render :: proc(ctx: RenderContext) -> bool {
         ok = sdl.SubmitGPUCommandBuffer(cmd_buf); assert(ok, "Failed to submit command buffer")
 
         return false
-
-    }
 
 }
 
@@ -369,8 +371,8 @@ get_tex_data_size :: proc(texture: Texture) -> int {
 }
 
 // Integration with scripting
-set_render_camera :: proc(render_ctx: ^RenderContext, render_cam: RenderCamera) {
+set_render_camera :: proc(app: ^Application, render_cam: RenderCamera) {
 
-    render_ctx.camera = render_cam;
+    app.render_ctx.camera = render_cam;
 
 }

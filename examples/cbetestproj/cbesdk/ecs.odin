@@ -20,15 +20,15 @@ Component :: struct {
 // Override procedures to give system functionality
 System :: struct {
     name:   string,
-    start:  proc(scene: Scene),
-    update: proc(scene: Scene, deltaTime: f32)
+    start:  proc(scene: ^Scene),
+    update: proc(scene: ^Scene, deltaTime: f32)
 }
 
 // Special system that gets the Application as well
 AppSystem :: struct {
     name:   string,
-    start:  proc(scene: Scene, app: Application),
-    update: proc(scene: Scene, app: Application, deltaTime: f32)
+    start:  proc(scene: ^Scene, app: ^Application),
+    update: proc(scene: ^Scene, app: ^Application, deltaTime: f32)
 }
 
 // Mostly for uuid gen
