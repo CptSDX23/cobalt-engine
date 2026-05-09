@@ -12,3 +12,7 @@ The Cobalt Engine SDK is an Odin package containing all the structs, procedures,
 
 ## Example Projects
 This repository also contains some example project folders users can use to start their projects or explore what Cobalt Engine is capable of. These projects should be updated for the most recent version of the engine.
+
+# Screenshots
+<p align="center"><img src="github/images/chocolateShipFleet.png" alt="Cobalt Log" height="600"></img></p>
+<i>A fleet of chocolateShip.obj, textured with fries.png</i>
