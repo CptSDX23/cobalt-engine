@@ -1,7 +1,9 @@
 package cbetestproj
 
+import "core:relative"
 import "core:fmt"
 import "core:strconv"
+import "core:math/linalg"
 import "cobalt:cbesdk"
 
 TestComponent :: struct {
@@ -46,24 +48,43 @@ test_system := cbesdk.System {
         for cam, i in cam_matches {
             if cam.is_main {
 
-                transform_matches, t_indices  := cbesdk.query_scene_components_uuid(scene^, cbesdk.Transform, cam_uuids[i])
+                transform_matches, t_indices := cbesdk.query_scene_components_uuid(scene^, cbesdk.Transform, cam_uuids[i])
 
                 // Move from input
-                move_speed := 10 * deltaTime;
+                move_speed := 25 * deltaTime
+                look_sens  := f32(1)
+                move_vec   := cbesdk.Vector3f{0, 0, 0}
                 if (scene.input_state.key_pressed[.W]) {
-                    transform_matches[0].position += {0, 0, move_speed}
+                    move_vec += {0, 0, move_speed}
                 }
                 if (scene.input_state.key_pressed[.S]) {
-                    transform_matches[0].position -= {0, 0, move_speed}
+                    move_vec -= {0, 0, move_speed}
                 }
                 if (scene.input_state.key_pressed[.A]) {
-                    transform_matches[0].position -= {move_speed, 0, 0}
+                    move_vec -= {move_speed, 0, 0}
                 }
                 if (scene.input_state.key_pressed[.D]) {
-                    transform_matches[0].position += {move_speed, 0, 0}
+                    move_vec += {move_speed, 0, 0}
+                }
+                if (scene.input_state.key_pressed[.Q]) {
+                    move_vec -= {0, move_speed, 0}
+                }
+                if (scene.input_state.key_pressed[.E]) {
+                    move_vec += {0, move_speed, 0}
+                }
+                if (scene.input_state.key_pressed[.LSHIFT]) {
+                    move_vec *= 5
+                }
+                if (scene.input_state.key_pressed[.LCTRL]) {
+                    move_vec *= 0.2
                 }
 
-                transform_matches[0].rotation += {0, 0, 0}
+                // Transform to relative
+                forward := cbesdk.forward_from_rotation(transform_matches[0].rotation)
+                right   := cbesdk.right_from_rotation(transform_matches[0].rotation)
+                up      := cbesdk.up_from_rotation(transform_matches[0].rotation)
+                transform_matches[0].position += -forward * move_vec.z + right * move_vec.x + up * move_vec.y
+                transform_matches[0].rotation += {scene.input_state.mouse_delta.y, scene.input_state.mouse_delta.x, 0} * look_sens
 
                 cbesdk.write_back_components(scene, cbesdk.Transform, transform_matches, t_indices)
 

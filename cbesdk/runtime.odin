@@ -2,10 +2,12 @@ package cbesdk
 
 import "core:fmt"
 
+// Abstracting away things that regular scene interacters should mess with
 Application :: struct {
     scene:      Scene,
     registry:   TypeRegistry,
     render_ctx: RenderContext,
+    fps_state:  FPSState,
 }
 
 // Just the state of an ECS
@@ -18,22 +20,22 @@ Scene :: struct {
 }
 
 // Scene procedures
-update_scene :: proc(scene: ^Scene) {
+update_scene :: proc(scene: ^Scene, deltaTime: f32) {
 
     components := scene.components[:]
     systems    := scene.systems[:]
 
     for system in systems {
-        system.update(scene, 0.01)
+        system.update(scene, deltaTime)
     }
 
 }
 
-update_app :: proc(scene: ^Scene, app: ^Application) {
+update_app :: proc(scene: ^Scene, app: ^Application, deltaTime: f32) {
 
     app_systems := scene.app_systems[:]
     for app_system in app_systems {
-        app_system.update(scene, app, 0.01)
+        app_system.update(scene, app, deltaTime)
     }
 
 }
@@ -214,10 +216,14 @@ create_application :: proc(registry: ^TypeRegistry, abs_proj_path: string) -> Ap
     register_component_data(registry, Camera, CAMERA_CONSTRUCTOR)
     register_app_system(registry, CAM_APP_SYSTEM)
 
+    // Init FPS as well
+    render_ctx, fps_state := create_render_ctx(settings.win_settings)
+
     return Application {
         scene      = load_scene(registry^),
         registry   = registry^,
-        render_ctx = create_render_ctx(settings.win_settings),
+        render_ctx = render_ctx,
+        fps_state  = fps_state,
     }
 
 }
@@ -228,9 +234,9 @@ run_application :: proc(app: ^Application) {
     
     loop: for {
 
-        update_app(&app.scene, app)
-        update_scene(&app.scene)
-        quit := run_render(app.render_ctx, &app.scene.input_state)
+        update_app(&app.scene, app, get_fps(app.fps_state))
+        update_scene(&app.scene, get_fps(app.fps_state))
+        quit := run_render(app.render_ctx, &app.scene.input_state, &app.fps_state)
 
         // Exit app
         if quit {

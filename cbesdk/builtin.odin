@@ -1,6 +1,7 @@
 package cbesdk
 
 import "core:fmt"
+import "core:math/linalg"
 import "core:strconv"
 
 // Builtin components and systems
@@ -8,6 +9,17 @@ Vector2f :: [2]f32
 Vector2i :: [2]i32
 Vector3f :: [3]f32
 Vector3i :: [3]i32
+
+// Maths
+forward_from_rotation :: proc(rot: Vector3f) -> Vector3f {
+    return linalg.matrix3_from_yaw_pitch_roll_f32(linalg.to_radians(rot.y), linalg.to_radians(rot.x), linalg.to_radians(rot.z)) * Vector3f {0, 0, -1}
+}
+right_from_rotation :: proc(rot: Vector3f) -> Vector3f {
+    return linalg.matrix3_from_yaw_pitch_roll_f32(linalg.to_radians(rot.y), linalg.to_radians(rot.x), linalg.to_radians(rot.z)) * Vector3f {1, 0, 0}
+}
+up_from_rotation :: proc(rot: Vector3f) -> Vector3f {
+    return linalg.matrix3_from_yaw_pitch_roll_f32(linalg.to_radians(rot.y), linalg.to_radians(rot.x), linalg.to_radians(rot.z)) * Vector3f {0, 1, 0}
+}
 
 Transform :: struct {
     position: Vector3f,
@@ -91,12 +103,14 @@ CAM_APP_SYSTEM :: AppSystem {
             if cam.is_main {
 
                 transform_matches, m_indices := query_scene_components_uuid(scene^, Transform, cam_uuids[i])
+                forward                      := forward_from_rotation(transform_matches[0].rotation)
 
                 set_render_camera(app, RenderCamera {
                     position        = transform_matches[0].position,
                     rotation        = transform_matches[0].rotation,
                     fov             = cam.fov,
-                    clipping_planes = {cam.near_plane, cam.far_plane}
+                    clipping_planes = {cam.near_plane, cam.far_plane},
+                    forward         = forward,
                 })
 
             }

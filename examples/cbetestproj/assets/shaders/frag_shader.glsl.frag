@@ -8,5 +8,7 @@ layout(location = 0) out vec4 frag_color;
 layout(set = 2, binding = 0) uniform sampler2D tex_sampler;
 
 void main() {
-    frag_color = texture(tex_sampler, uv) * color;
+    vec4 final = texture(tex_sampler, uv);
+    final.rgb  = pow(final.rgb, vec3(1));
+    frag_color = final * color;
 }

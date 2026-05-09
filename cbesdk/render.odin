@@ -48,13 +48,14 @@ RenderCamera :: struct {
     rotation:        Vector3f,
     fov:             f32,
     clipping_planes: Vector2f,
+    forward:         Vector3f,
 }
 
 // Debug
 ROTATION := f32(0)
 
 // Defaults
-create_render_ctx :: proc(win_settings: WindowSettings) -> RenderContext {
+create_render_ctx :: proc(win_settings: WindowSettings) -> (RenderContext, FPSState) {
     
     ok     := sdl.Init({.VIDEO}); assert(ok, "Failed to initialize SDL3")
     window := sdl.CreateWindow(win_settings.name, win_settings.size.x, win_settings.size.y, {}); assert(window != nil, "Failed to create window")
@@ -62,6 +63,7 @@ create_render_ctx :: proc(win_settings: WindowSettings) -> RenderContext {
 
     // This should have been up here a long time ago i wasted so much time
     ok = sdl.ClaimWindowForGPUDevice(gpu, window); assert(ok, "Failed to claim window for GPU device")
+    ok = sdl.SetWindowRelativeMouseMode(window, true); assert(ok, "Failed to lock mouse to window")
 
     // Load all shaders to create pipeline
     shaders := make([dynamic]^sdl.GPUShader)
@@ -73,14 +75,14 @@ create_render_ctx :: proc(win_settings: WindowSettings) -> RenderContext {
 
     // Load models
     models := make([dynamic]Model)
-    append(&models, load_obj("target/assets/teapot.obj"))
+    append(&models, load_obj("target/assets/ChocolateShip.obj"))
 
     // Camera
     cam := RenderCamera {
         position        = {0, 0, 0},
         rotation        = {0, 0, 0},
-        fov             = 70,
-        clipping_planes = {0.001, 10000}
+        fov             = 60,
+        clipping_planes = {0.01, 100}
     }
 
     // Create depth texture
@@ -127,6 +129,10 @@ create_render_ctx :: proc(win_settings: WindowSettings) -> RenderContext {
             enable_depth_write = true,
             compare_op         = .LESS,
         },
+        // For some reason its front
+        rasterizer_state = {
+            cull_mode = .FRONT,
+        }
     })
 
     return RenderContext { 
@@ -139,12 +145,15 @@ create_render_ctx :: proc(win_settings: WindowSettings) -> RenderContext {
         models    = models,
         camera    = cam,
         settings  = win_settings,
-    }
+    }, FPSState { last_ticks = sdl.GetTicks(), curr_ticks = sdl.GetTicks() }
 
 }
 
 // The boolean indicates whether the application should exit
-run_render :: proc(ctx: RenderContext, input: ^InputState) -> bool {
+run_render :: proc(ctx: RenderContext, input: ^InputState, fps_state: ^FPSState) -> bool {
+
+        // Stupid reset
+        set_mouse_delta(input, {0, 0})
 
         // Events
         event: sdl.Event
@@ -158,8 +167,14 @@ run_render :: proc(ctx: RenderContext, input: ^InputState) -> bool {
                 case .KEY_UP:
                     //input.key_pressed[event.key.scancode] = false
                     set_key_up(input, event.key.scancode)
+                case .MOUSE_MOTION:
+                    set_mouse_delta(input, {event.motion.xrel, event.motion.yrel})
             }
         }
+
+        // FPS
+        fps_state.last_ticks = fps_state.curr_ticks
+        fps_state.curr_ticks = sdl.GetTicks()
 
         // ROTATION += 1
 
@@ -178,8 +193,9 @@ run_render :: proc(ctx: RenderContext, input: ^InputState) -> bool {
         ok = sdl.GetWindowSize(ctx.window, &win_size.x, &win_size.y); assert(ok, "Failed to get window size for projection matrix")
 
         // Z+ is away from the camera i dont want to hear about it
+        // Also look_at for the camera is confusing and took me a while to get
         proj_mat  := linalg.matrix4_perspective_f32(linalg.to_radians(ctx.camera.fov), f32(win_size.x) / f32(win_size.y), ctx.camera.clipping_planes.x, ctx.camera.clipping_planes.y, false)
-        view_mat  := create_transform_matrix(ctx.camera.position, ctx.camera.rotation, true)
+        view_mat  := linalg.matrix4_look_at_f32(ctx.camera.position, ctx.camera.position + ctx.camera.forward, {0, 1, 0})
         model_mat := create_transform_matrix({0, 0, 25}, {0, ROTATION, 0}, false)
         ubo       := UBO { mvp = proj_mat * view_mat * model_mat }
 
@@ -235,6 +251,12 @@ run_render :: proc(ctx: RenderContext, input: ^InputState) -> bool {
 
         sdl.EndGPUCopyPass(copy_pass)
         ok = sdl.SubmitGPUCommandBuffer(copy_cmd_buf); assert(ok, "Failed to submit copy buffer")
+
+        // Freeing memory might be a good idea
+        sdl.ReleaseGPUBuffer(ctx.gpu, vertex_buf)
+        sdl.ReleaseGPUBuffer(ctx.gpu, index_buf)
+        sdl.ReleaseGPUTransferBuffer(ctx.gpu, transfer_buf)
+        sdl.ReleaseGPUTransferBuffer(ctx.gpu, tex_transfer_buf)
 
         // Draw passes
         color_target := sdl.GPUColorTargetInfo {
