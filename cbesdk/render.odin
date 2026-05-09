@@ -14,7 +14,6 @@ RenderContext :: struct {
     pipeline:  ^sdl.GPUGraphicsPipeline,
     depth_tex: ^sdl.GPUTexture,
     shaders:   [dynamic]^sdl.GPUShader,
-    textures:  [dynamic]Texture,
     models:    [dynamic]Model,
     camera:    RenderCamera,
     settings:  WindowSettings,
@@ -69,15 +68,22 @@ create_render_ctx :: proc(win_settings: WindowSettings) -> (RenderContext, FPSSt
     shaders := make([dynamic]^sdl.GPUShader)
     load_all_shaders(gpu, &shaders)
 
-    // Load images
-    textures := make([dynamic]Texture)
-    append(&textures, load_texture(gpu, "target/assets/fries.png", 1))
-
     // Load models
-    models := make([dynamic]Model)
-    append(&models, load_obj("target/assets/ChocolateShip.obj"))
+    models     := make([dynamic]Model)
+    test_model := load_obj_model(gpu, "target/assets/ChocolateShip.obj", "target/assets/fries.png", 1)
+    set_model_transform(&test_model, {0, 0, 25}, {0, ROTATION, 0})
+    set_model_buffers(gpu, &test_model)
+    append(&models, test_model)
+    test_model = load_obj_model(gpu, "target/assets/ChocolateShip.obj", "target/assets/fries.png", 1)
+    set_model_transform(&test_model, {0, 0, 60}, {0, ROTATION, 0})
+    set_model_buffers(gpu, &test_model)
+    append(&models, test_model)
+    test_model = load_obj_model(gpu, "target/assets/ChocolateShip.obj", "target/assets/fries.png", 1)
+    set_model_transform(&test_model, {0, 0, 95}, {0, ROTATION, 0})
+    set_model_buffers(gpu, &test_model)
+    append(&models, test_model)
 
-    // Camera
+    // Camera (defaults)
     cam := RenderCamera {
         position        = {0, 0, 0},
         rotation        = {0, 0, 0},
@@ -129,19 +135,19 @@ create_render_ctx :: proc(win_settings: WindowSettings) -> (RenderContext, FPSSt
             enable_depth_write = true,
             compare_op         = .LESS,
         },
-        // For some reason its front
         rasterizer_state = {
-            cull_mode = .FRONT,
+            front_face = .CLOCKWISE,
+            cull_mode  = .BACK,
         }
     })
 
+    // Now ready to start drawing
     return RenderContext { 
         window    = window, 
         gpu       = gpu, 
         pipeline  = pipeline, 
         depth_tex = depth_tex,
         shaders   = shaders,
-        textures  = textures,
         models    = models,
         camera    = cam,
         settings  = win_settings,
@@ -188,75 +194,14 @@ run_render :: proc(ctx: RenderContext, input: ^InputState, fps_state: ^FPSState)
             return false
         }
 
-        // Get projection matrix
+        // Get projection and view matrix
         win_size: [2]i32
         ok = sdl.GetWindowSize(ctx.window, &win_size.x, &win_size.y); assert(ok, "Failed to get window size for projection matrix")
 
         // Z+ is away from the camera i dont want to hear about it
         // Also look_at for the camera is confusing and took me a while to get
-        proj_mat  := linalg.matrix4_perspective_f32(linalg.to_radians(ctx.camera.fov), f32(win_size.x) / f32(win_size.y), ctx.camera.clipping_planes.x, ctx.camera.clipping_planes.y, false)
-        view_mat  := linalg.matrix4_look_at_f32(ctx.camera.position, ctx.camera.position + ctx.camera.forward, {0, 1, 0})
-        model_mat := create_transform_matrix({0, 0, 25}, {0, ROTATION, 0}, false)
-        ubo       := UBO { mvp = proj_mat * view_mat * model_mat }
-
-        vertices := ctx.models[0].verts[:]
-        indices  := ctx.models[0].indices[:]
-
-        vertex_buf := sdl.CreateGPUBuffer(ctx.gpu, {
-            usage = {.VERTEX},
-            size  = u32(get_vert_data_size(vertices)),
-        })
-        index_buf := sdl.CreateGPUBuffer(ctx.gpu, {
-            usage = {.INDEX},
-            size  = u32(get_index_data_size(indices)),
-        })
-        transfer_buf := sdl.CreateGPUTransferBuffer(ctx.gpu, {
-            usage = .UPLOAD,
-            size  = u32(get_vert_data_size(vertices) + get_index_data_size(indices)),
-        })
-        tex_transfer_buf := sdl.CreateGPUTransferBuffer(ctx.gpu, {
-            usage = .UPLOAD,
-            size  = u32(get_tex_data_size(ctx.textures[0])),
-        })
-        
-        // Crazy odin shit
-        transfer_mem := transmute([^]byte)sdl.MapGPUTransferBuffer(ctx.gpu, transfer_buf, false)
-        mem.copy(transfer_mem,                                raw_data(vertices), get_vert_data_size(vertices))
-        mem.copy(transfer_mem[get_vert_data_size(vertices):], raw_data(indices), get_index_data_size(indices))
-        sdl.UnmapGPUTransferBuffer(ctx.gpu, transfer_buf)
-
-        tex_transfer_mem := sdl.MapGPUTransferBuffer(ctx.gpu, tex_transfer_buf, false)
-        mem.copy(tex_transfer_mem, ctx.textures[0].pixels, get_tex_data_size(ctx.textures[0]))
-        sdl.UnmapGPUTransferBuffer(ctx.gpu, tex_transfer_buf)
-
-        // Vertex and index copy pass
-        copy_cmd_buf := sdl.AcquireGPUCommandBuffer(ctx.gpu)
-        copy_pass    := sdl.BeginGPUCopyPass(copy_cmd_buf)
-
-        sdl.UploadToGPUBuffer(copy_pass,
-            { transfer_buffer = transfer_buf },
-            { buffer = vertex_buf, size = u32(get_vert_data_size(vertices)) },
-            false,
-        )
-        sdl.UploadToGPUBuffer(copy_pass,
-            { transfer_buffer = transfer_buf, offset = u32(get_vert_data_size(vertices)) },
-            { buffer = index_buf, size = u32(get_index_data_size(indices)) },
-            false,
-        )
-        sdl.UploadToGPUTexture(copy_pass,
-            { transfer_buffer = tex_transfer_buf },
-            { texture = ctx.textures[0].tex, w = u32(ctx.textures[0].size.x), h = u32(ctx.textures[0].size.y), d = 1 },
-            false,
-        )
-
-        sdl.EndGPUCopyPass(copy_pass)
-        ok = sdl.SubmitGPUCommandBuffer(copy_cmd_buf); assert(ok, "Failed to submit copy buffer")
-
-        // Freeing memory might be a good idea
-        sdl.ReleaseGPUBuffer(ctx.gpu, vertex_buf)
-        sdl.ReleaseGPUBuffer(ctx.gpu, index_buf)
-        sdl.ReleaseGPUTransferBuffer(ctx.gpu, transfer_buf)
-        sdl.ReleaseGPUTransferBuffer(ctx.gpu, tex_transfer_buf)
+        proj_mat := linalg.matrix4_perspective_f32(linalg.to_radians(ctx.camera.fov), f32(win_size.x) / f32(win_size.y), ctx.camera.clipping_planes.x, ctx.camera.clipping_planes.y, false)
+        view_mat := linalg.matrix4_look_at_f32(ctx.camera.position, ctx.camera.position + ctx.camera.forward, {0, 1, 0})
 
         // Draw passes
         color_target := sdl.GPUColorTargetInfo {
@@ -272,17 +217,24 @@ run_render :: proc(ctx: RenderContext, input: ^InputState, fps_state: ^FPSState)
             store_op    = .DONT_CARE,
         }
         render_pass := sdl.BeginGPURenderPass(cmd_buf, &color_target, 1, &depth_target)
+        sdl.BindGPUGraphicsPipeline(render_pass, ctx.pipeline)
 
         // Draw commands
-        sdl.BindGPUGraphicsPipeline(render_pass, ctx.pipeline)
-        sdl.BindGPUVertexBuffers(render_pass, 0, &sdl.GPUBufferBinding { buffer = vertex_buf }, 1)
-        sdl.BindGPUIndexBuffer(render_pass, { buffer = index_buf }, ._32BIT)
-        sdl.PushGPUVertexUniformData(cmd_buf, 0, &ubo, size_of(ubo))
-        sdl.BindGPUFragmentSamplers(render_pass, 0, &sdl.GPUTextureSamplerBinding {
-            texture = ctx.textures[0].tex,
-            sampler = ctx.textures[0].sampler,
-        }, 1)
-        sdl.DrawGPUIndexedPrimitives(render_pass, u32(len(vertices)), 1, 0, 0, 0)
+        for model in ctx.models {
+
+            model_mat := create_transform_matrix(model.position, model.rotation, false)
+            ubo       := UBO { mvp = proj_mat * view_mat * model_mat }
+
+            sdl.BindGPUVertexBuffers(render_pass, 0, &sdl.GPUBufferBinding { buffer = model.buffers.vertex_buf }, 1)
+            sdl.BindGPUIndexBuffer(render_pass, { buffer = model.buffers.index_buf }, ._32BIT)
+            sdl.PushGPUVertexUniformData(cmd_buf, 0, &ubo, size_of(ubo))
+            sdl.BindGPUFragmentSamplers(render_pass, 0, &sdl.GPUTextureSamplerBinding {
+                texture = model.texture.tex,
+                sampler = model.texture.sampler,
+            }, 1)
+            sdl.DrawGPUIndexedPrimitives(render_pass, u32(len(model.mesh.verts)), 1, 0, 0, 0)
+
+        }
 
         sdl.EndGPURenderPass(render_pass)
 
@@ -332,9 +284,9 @@ load_texture :: proc(gpu: ^sdl.GPUDevice, path: cstring, flip: i32) -> Texture {
 
     img_size: [2]i32
     stb.set_flip_vertically_on_load(flip)
-    pixels  := stb.load(path, &img_size.x, &img_size.y, nil, 4); //assert(pixels != nil, "Failed to load texture")
+    pixels := stb.load(path, &img_size.x, &img_size.y, nil, 4); //assert(pixels != nil, "Failed to load texture")
     if (pixels == nil) {
-        fmt.println("Bad")
+        fmt.println("Failed to load pixels from image")
     }
     texture := sdl.CreateGPUTexture(gpu, {
         type                 = .D2,

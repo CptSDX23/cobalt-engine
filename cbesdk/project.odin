@@ -32,6 +32,10 @@ load_settings_from_proj :: proc(proj_path: string) -> ProjectSettings {
     // Key value pairs split by line
     lines := string(data)
 	for line in strings.split_lines_iterator(&lines) {
+
+        if strings.starts_with(line, "//") {
+            continue
+        }
         
         // Lazy error checking
         split := strings.split(line, ":")

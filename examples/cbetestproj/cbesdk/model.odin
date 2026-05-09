@@ -2,14 +2,28 @@ package cbesdk
 
 import "core:fmt"
 import "core:os"
+import "core:mem"
 import "core:strings"
 import "core:strconv"
 import sdl "vendor:sdl3"
 
 // Loading .obj models
-Model :: struct {
+Mesh :: struct {
     verts:   []VertexData,
     indices: []u32,
+}
+
+Model :: struct {
+    mesh:     Mesh,
+    texture:  Texture,
+    buffers:  ModelBufferInfo,
+    position: Vector3f,
+    rotation: Vector3f,
+}
+
+ModelBufferInfo :: struct {
+    vertex_buf: ^sdl.GPUBuffer,
+    index_buf:  ^sdl.GPUBuffer,
 }
 
 FaceIndex :: struct {
@@ -17,9 +31,9 @@ FaceIndex :: struct {
     uvs:   [3]u32,
 }
 
-load_obj :: proc(path: string) -> Model {
+load_obj_mesh :: proc(path: string) -> Mesh {
 
-    model        := Model {}
+    mesh         := Mesh {}
     vert_poses   := make([dynamic]Vector3f)
     vert_cols    := make([dynamic]sdl.FColor)
     vert_uvs     := make([dynamic]Vector2f)
@@ -34,7 +48,7 @@ load_obj :: proc(path: string) -> Model {
     
     if err != nil {
         fmt.println("Failed to read obj file")
-        return model
+        return mesh
     }
 
     // Parse everything
@@ -54,8 +68,6 @@ load_obj :: proc(path: string) -> Model {
             case "vt":
                 append(&vert_uvs, parse_vert_uv(parts))
             case "f":
-                // append_elems(&face_poses, ..parse_face_pos(parts))
-                // append_elems(&face_uvs, ..parse_face_uv(parts))
                 append(&face_indices, parse_face_index(parts))
 
         }
@@ -80,12 +92,96 @@ load_obj :: proc(path: string) -> Model {
 
     }
 
-    model = Model {
+    mesh = Mesh {
         verts   = final_verts[:],
         indices = final_indices[:],
     }
 
-    return model
+    return mesh
+
+}
+
+load_obj_model :: proc(gpu: ^sdl.GPUDevice, obj_path: string, tex_path: string, flip_tex: i32) -> Model {
+
+    mesh := load_obj_mesh(obj_path)
+    tex  := load_texture(gpu, strings.clone_to_cstring(tex_path), flip_tex)
+
+    return Model {
+        mesh    = mesh,
+        texture = tex,
+    }
+
+}
+
+// Upload the data once on model creation, and store it to be draw later
+// This combined with changing UBOs is the secret to drawing multiple models!
+set_model_buffers :: proc(gpu: ^sdl.GPUDevice, model: ^Model) {
+
+    vertices := model.mesh.verts[:]
+    indices  := model.mesh.indices[:]
+
+    vertex_buf := sdl.CreateGPUBuffer(gpu, {
+        usage = {.VERTEX},
+        size  = u32(get_vert_data_size(vertices)),
+    })
+    index_buf := sdl.CreateGPUBuffer(gpu, {
+        usage = {.INDEX},
+        size  = u32(get_index_data_size(indices)),
+    })
+    geo_transfer_buf := sdl.CreateGPUTransferBuffer(gpu, {
+        usage = .UPLOAD,
+        size  = u32(get_vert_data_size(vertices) + get_index_data_size(indices)),
+    })
+    tex_transfer_buf := sdl.CreateGPUTransferBuffer(gpu, {
+        usage = .UPLOAD,
+        size  = u32(get_tex_data_size(model.texture)),
+    })
+
+    // Crazy odin shit
+    transfer_mem := transmute([^]byte)sdl.MapGPUTransferBuffer(gpu, geo_transfer_buf, false)
+    mem.copy(transfer_mem,                                raw_data(vertices), get_vert_data_size(vertices))
+    mem.copy(transfer_mem[get_vert_data_size(vertices):], raw_data(indices), get_index_data_size(indices))
+    sdl.UnmapGPUTransferBuffer(gpu, geo_transfer_buf)
+
+    tex_transfer_mem := sdl.MapGPUTransferBuffer(gpu, tex_transfer_buf, false)
+    mem.copy(tex_transfer_mem, model.texture.pixels, get_tex_data_size(model.texture))
+    sdl.UnmapGPUTransferBuffer(gpu, tex_transfer_buf)
+
+    // Vertex and index copy pass
+    copy_cmd_buf := sdl.AcquireGPUCommandBuffer(gpu)
+    copy_pass    := sdl.BeginGPUCopyPass(copy_cmd_buf)
+
+    sdl.UploadToGPUBuffer(copy_pass,
+        { transfer_buffer = geo_transfer_buf },
+        { buffer = vertex_buf, size = u32(get_vert_data_size(vertices)) },
+        false,
+    )
+    sdl.UploadToGPUBuffer(copy_pass,
+        { transfer_buffer = geo_transfer_buf, offset = u32(get_vert_data_size(vertices)) },
+        { buffer = index_buf, size = u32(get_index_data_size(indices)) },
+        false,
+    )
+    sdl.UploadToGPUTexture(copy_pass,
+        { transfer_buffer = tex_transfer_buf },
+        { texture = model.texture.tex, w = u32(model.texture.size.x), h = u32(model.texture.size.y), d = 1 },
+        false,
+    )
+
+    sdl.EndGPUCopyPass(copy_pass)
+    ok := sdl.SubmitGPUCommandBuffer(copy_cmd_buf); assert(ok, "Failed to submit copy buffer")
+
+    // Regular buffers will stay
+    model.buffers.vertex_buf = vertex_buf
+    model.buffers.index_buf  = index_buf
+    sdl.ReleaseGPUTransferBuffer(gpu, geo_transfer_buf)
+    sdl.ReleaseGPUTransferBuffer(gpu, tex_transfer_buf)
+
+}
+
+set_model_transform :: proc(model: ^Model, pos: Vector3f, rot: Vector3f) {
+
+    model.position = pos
+    model.rotation = rot
 
 }
 
