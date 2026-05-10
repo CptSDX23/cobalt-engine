@@ -29,8 +29,8 @@ test_component_constructor :: proc(args: [dynamic]string) -> any {
 
 test_system := cbesdk.System {
 
-    name   = "TestSystem",
-    start  = proc(scene: ^cbesdk.Scene) {
+    name  = "TestSystem",
+    start = proc(scene: ^cbesdk.Scene) {
         fmt.println("Started TestSystem")
     },
     update = proc(scene: ^cbesdk.Scene, deltaTime: f32) {

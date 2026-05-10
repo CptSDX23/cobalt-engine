@@ -178,29 +178,45 @@ load_scene :: proc(registry: TypeRegistry) -> Scene {
 
     scene := Scene { input_state = InputState {} }
 
-    // Make entity
-    entity    := create_entity("Test")
-    user_args := make([dynamic]string); append(&user_args, "42")
-    tran_args := make([dynamic]string); append_elems(&tran_args, "-5", "0", "0", "0", "0", "0", "1", "1", "1")
-    cam_args  := make([dynamic]string); append_elems(&cam_args, "60", "0.001", "10000", "true")
+    // Make cam mover entity
+    centity    := create_entity("CamMover")
+    user_args  := make([dynamic]string); append(&user_args, "42")
+    ctran_args := make([dynamic]string); append_elems(&ctran_args, "-5", "0", "0", "0", "0", "0", "1", "1", "1")
+    cam_args   := make([dynamic]string); append_elems(&cam_args, "60", "0.001", "10000", "true")
     defer delete(user_args)
-    defer delete(tran_args)
+    defer delete(ctran_args)
     defer delete(cam_args)
 
     // Bind component generated from constructor
-    user_struct := registry.constructors["TestComponent"](user_args)
-    tran_struct := registry.constructors["Transform"](tran_args)
-    cam_struct  := registry.constructors["Camera"](cam_args)
-    bind_entity_component(&scene, entity, create_component(user_struct))
-    bind_entity_component(&scene, entity, create_component(tran_struct))
-    bind_entity_component(&scene, entity, create_component(cam_struct))
-    add_scene_entity(&scene, entity)
+    user_struct  := registry.constructors["TestComponent"](user_args)
+    ctran_struct := registry.constructors["Transform"](ctran_args)
+    cam_struct   := registry.constructors["Camera"](cam_args)
+    bind_entity_component(&scene, centity, create_component(user_struct))
+    bind_entity_component(&scene, centity, create_component(ctran_struct))
+    bind_entity_component(&scene, centity, create_component(cam_struct))
+    add_scene_entity(&scene, centity)
+
+    // Make ship entity
+    sentity    := create_entity("Ship01")
+    mesh_args  := make([dynamic]string); append(&mesh_args, "target/assets/ChocolateShip.obj", "target/assets/fries.png")
+    stran_args := make([dynamic]string); append_elems(&stran_args, "50", "0", "0", "0", "0", "0", "1", "1", "1")
+    defer delete(mesh_args)
+    defer delete(stran_args)
+
+    // Bind component generated from constructor
+    mesh_struct  := registry.constructors["MeshRenderer"](mesh_args)
+    stran_struct := registry.constructors["Transform"](stran_args)
+    bind_entity_component(&scene, sentity, create_component(mesh_struct))
+    bind_entity_component(&scene, sentity, create_component(stran_struct))
+    add_scene_entity(&scene, sentity)
 
     // Systems
     user_system := registry.systems["TestSystem"]
     cam_system  := registry.app_systems["CameraSystem"]
+    mesh_system := registry.app_systems["MeshRendererSystem"]
     add_scene_system(&scene, user_system)
     add_scene_app_system(&scene, cam_system)
+    add_scene_app_system(&scene, mesh_system)
 
     return scene
 
@@ -214,7 +230,9 @@ create_application :: proc(registry: ^TypeRegistry, abs_proj_path: string) -> Ap
     // Load builtins
     register_component_data(registry, Transform, TRANSFORM_CONSTRUCTOR)
     register_component_data(registry, Camera, CAMERA_CONSTRUCTOR)
+    register_component_data(registry, MeshRenderer, MESH_RENDERER_CONSTRUCTOR)
     register_app_system(registry, CAM_APP_SYSTEM)
+    register_app_system(registry, MESH_RENDERER_APP_SYSTEM)
 
     // Init FPS as well
     render_ctx, fps_state := create_render_ctx(settings.win_settings)
@@ -229,7 +247,8 @@ create_application :: proc(registry: ^TypeRegistry, abs_proj_path: string) -> Ap
 }
 
 run_application :: proc(app: ^Application) {
-
+    
+    start_app(&app.scene, app)
     start_scene(&app.scene)
     
     loop: for {

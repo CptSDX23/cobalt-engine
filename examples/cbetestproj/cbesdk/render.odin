@@ -203,65 +203,6 @@ run_render :: proc(ctx: RenderContext, input: ^InputState, fps_state: ^FPSState)
         proj_mat := linalg.matrix4_perspective_f32(linalg.to_radians(ctx.camera.fov), f32(win_size.x) / f32(win_size.y), ctx.camera.clipping_planes.x, ctx.camera.clipping_planes.y, false)
         view_mat := linalg.matrix4_look_at_f32(ctx.camera.position, ctx.camera.position + ctx.camera.forward, {0, 1, 0})
 
-        // vertices := ctx.models[0].mesh.verts[:]
-        // indices  := ctx.models[0].mesh.indices[:]
-
-        // vertex_buf := sdl.CreateGPUBuffer(ctx.gpu, {
-        //     usage = {.VERTEX},
-        //     size  = u32(get_vert_data_size(vertices)),
-        // })
-        // index_buf := sdl.CreateGPUBuffer(ctx.gpu, {
-        //     usage = {.INDEX},
-        //     size  = u32(get_index_data_size(indices)),
-        // })
-        // transfer_buf := sdl.CreateGPUTransferBuffer(ctx.gpu, {
-        //     usage = .UPLOAD,
-        //     size  = u32(get_vert_data_size(vertices) + get_index_data_size(indices)),
-        // })
-        // tex_transfer_buf := sdl.CreateGPUTransferBuffer(ctx.gpu, {
-        //     usage = .UPLOAD,
-        //     size  = u32(get_tex_data_size(ctx.models[0].texture)),
-        // })
-        
-        // // Crazy odin shit
-        // transfer_mem := transmute([^]byte)sdl.MapGPUTransferBuffer(ctx.gpu, transfer_buf, false)
-        // mem.copy(transfer_mem,                                raw_data(vertices), get_vert_data_size(vertices))
-        // mem.copy(transfer_mem[get_vert_data_size(vertices):], raw_data(indices), get_index_data_size(indices))
-        // sdl.UnmapGPUTransferBuffer(ctx.gpu, transfer_buf)
-
-        // tex_transfer_mem := sdl.MapGPUTransferBuffer(ctx.gpu, tex_transfer_buf, false)
-        // mem.copy(tex_transfer_mem, ctx.models[0].texture.pixels, get_tex_data_size(ctx.models[0].texture))
-        // sdl.UnmapGPUTransferBuffer(ctx.gpu, tex_transfer_buf)
-
-        // // Vertex and index copy pass
-        // copy_cmd_buf := sdl.AcquireGPUCommandBuffer(ctx.gpu)
-        // copy_pass    := sdl.BeginGPUCopyPass(copy_cmd_buf)
-
-        // sdl.UploadToGPUBuffer(copy_pass,
-        //     { transfer_buffer = transfer_buf },
-        //     { buffer = vertex_buf, size = u32(get_vert_data_size(vertices)) },
-        //     false,
-        // )
-        // sdl.UploadToGPUBuffer(copy_pass,
-        //     { transfer_buffer = transfer_buf, offset = u32(get_vert_data_size(vertices)) },
-        //     { buffer = index_buf, size = u32(get_index_data_size(indices)) },
-        //     false,
-        // )
-        // sdl.UploadToGPUTexture(copy_pass,
-        //     { transfer_buffer = tex_transfer_buf },
-        //     { texture = ctx.models[0].texture.tex, w = u32(ctx.models[0].texture.size.x), h = u32(ctx.models[0].texture.size.y), d = 1 },
-        //     false,
-        // )
-
-        // sdl.EndGPUCopyPass(copy_pass)
-        // ok = sdl.SubmitGPUCommandBuffer(copy_cmd_buf); assert(ok, "Failed to submit copy buffer")
-
-        // // Freeing memory might be a good idea
-        // sdl.ReleaseGPUBuffer(ctx.gpu, vertex_buf)
-        // sdl.ReleaseGPUBuffer(ctx.gpu, index_buf)
-        // sdl.ReleaseGPUTransferBuffer(ctx.gpu, transfer_buf)
-        // sdl.ReleaseGPUTransferBuffer(ctx.gpu, tex_transfer_buf)
-
         // Draw passes
         color_target := sdl.GPUColorTargetInfo {
             texture     = swapchain,
@@ -405,7 +346,9 @@ get_tex_data_size :: proc(texture: Texture) -> int {
 
 // Integration with scripting
 set_render_camera :: proc(app: ^Application, render_cam: RenderCamera) {
-
     app.render_ctx.camera = render_cam;
+}
 
+add_model :: proc(ctx: ^RenderContext, model: Model) {
+    append(&ctx.models, model)
 }

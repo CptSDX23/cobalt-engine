@@ -346,7 +346,9 @@ get_tex_data_size :: proc(texture: Texture) -> int {
 
 // Integration with scripting
 set_render_camera :: proc(app: ^Application, render_cam: RenderCamera) {
-
     app.render_ctx.camera = render_cam;
+}
 
+add_model :: proc(ctx: ^RenderContext, model: Model) {
+    append(&ctx.models, model)
 }

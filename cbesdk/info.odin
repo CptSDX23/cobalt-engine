@@ -1,5 +1,5 @@
 package cbesdk
 
 current_version :: proc() -> string {
-    return "0.0.5"
+    return "0.1.0"
 }

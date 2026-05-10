@@ -4,13 +4,12 @@ import "core:fmt"
 import "core:math/linalg"
 import "core:strconv"
 
-// Builtin components and systems
+// Maths
 Vector2f :: [2]f32
 Vector2i :: [2]i32
 Vector3f :: [3]f32
 Vector3i :: [3]i32
 
-// Maths
 forward_from_rotation :: proc(rot: Vector3f) -> Vector3f {
     return linalg.matrix3_from_yaw_pitch_roll_f32(linalg.to_radians(rot.y), linalg.to_radians(rot.x), linalg.to_radians(rot.z)) * Vector3f {0, 0, -1}
 }
@@ -21,6 +20,7 @@ up_from_rotation :: proc(rot: Vector3f) -> Vector3f {
     return linalg.matrix3_from_yaw_pitch_roll_f32(linalg.to_radians(rot.y), linalg.to_radians(rot.x), linalg.to_radians(rot.z)) * Vector3f {0, 1, 0}
 }
 
+// Builtin components and systems
 Transform :: struct {
     position: Vector3f,
     rotation: Vector3f,
@@ -90,10 +90,10 @@ CAMERA_CONSTRUCTOR :: proc(args: [dynamic]string) -> any {
     return ptr^
 
 }
-
 CAM_APP_SYSTEM :: AppSystem {
 
     name   = "CameraSystem",
+    start  = proc(scene: ^Scene, app: ^Application) {},
     update = proc(scene: ^Scene, app: ^Application, deltaTime: f32) {
 
         cam_matches, c_indices := query_scene_components(scene^, Camera)
@@ -102,7 +102,7 @@ CAM_APP_SYSTEM :: AppSystem {
         for cam, i in cam_matches {
             if cam.is_main {
 
-                transform_matches, m_indices := query_scene_components_uuid(scene^, Transform, cam_uuids[i])
+                transform_matches, t_indices := query_scene_components_uuid(scene^, Transform, cam_uuids[i])
                 forward                      := forward_from_rotation(transform_matches[0].rotation)
 
                 set_render_camera(app, RenderCamera {
@@ -117,5 +117,50 @@ CAM_APP_SYSTEM :: AppSystem {
         }
 
     }
+
+}
+
+MeshRenderer :: struct {
+    mesh_path:    string,
+    texture_path: string,
+}
+MESH_RENDERER_CONSTRUCTOR :: proc(args: [dynamic]string) -> any {
+
+    if len(args) != 2 {
+        return nil
+    }
+
+    // Have to put stuff on the heap
+    comp := MeshRenderer {
+        mesh_path    = "target/assets/ChocolateShip.obj",
+        texture_path = "target/assets/fries.png",
+    }
+    ptr  := new(MeshRenderer)
+    ptr^  = comp
+
+    return ptr^
+
+}
+MESH_RENDERER_APP_SYSTEM :: AppSystem {
+
+    name  = "MeshRendererSystem",
+    start = proc(scene: ^Scene, app: ^Application) {
+
+        mesh_matches, m_indices := query_scene_components(scene^, MeshRenderer)
+        mesh_uuids              := query_component_uuids(scene^, MeshRenderer)
+
+        for mesh, i in mesh_matches {
+
+            transform_matches, t_indices := query_scene_components_uuid(scene^, Transform, mesh_uuids[i])
+
+            model := load_obj_model(app.render_ctx.gpu, mesh.mesh_path, mesh.texture_path, 1)
+            set_model_transform(&model, transform_matches[0].position, transform_matches[0].rotation)
+            set_model_buffers(app.render_ctx.gpu, &model)
+            add_model(&app.render_ctx, model)
+
+        }
+
+    },
+    update = proc(scene: ^Scene, app: ^Application, deltaTime: f32) {},
 
 }
