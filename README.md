@@ -1,4 +1,5 @@
 <p align="center"><img src="github/images/cobaltLogoWide.png" alt="Cobalt Log" height="300"></img></p>
+<i>Disclaimer: This project is still in early developement! It does not yet have many of the features listed.</i>
 
 # Cobalt Engine
 This repository contains the source code for the Cobalt Engine Editor, Cobalt Engine SDK, and example projects.
@@ -8,11 +9,11 @@ Cobalt Engine is a game engine written in Odin focused on providing a simple scr
 The Cobalt Engine Editor is an interface to create and edit scenes, manage assets, and test projects. It uses the SDK to render the loaded scene, and has access to your project folder so you can import and configure assets and run your game from the editor.
 
 ## The SDK
-The Cobalt Engine SDK is an Odin package containing all the structs, procedures, and logic needed to make 3D and 2D games. Once a user registers their components and systems, the can create and run an application and automatically load scenes and begin the game loop. It also contains tons of builtin components and systems for things like transforms and rendering.
+The Cobalt Engine SDK is an Odin package containing all the structs, procedures, and logic needed to make 3D and 2D games. Once a user registers their components and systems, they can create and run an application and automatically load scenes and begin the game loop. It also contains tons of builtin components and systems for things like transforms and rendering.
 
 ## Example Projects
 This repository also contains some example project folders users can use to start their projects or explore what Cobalt Engine is capable of. These projects should be updated for the most recent version of the engine.
 
 # Screenshots
 <p align="center"><img src="github/images/chocolateShipFleet.png" alt="Cobalt Log" height="600"></img></p>
-<i>A fleet of chocolateShip.obj, textured with fries.png</i>
+<i>A fleet of chocolateShip.obj by <a href="https://opengameart.org/users/gundy">Gundy</a>, textured with fries.png</i>
