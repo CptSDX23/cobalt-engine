@@ -198,7 +198,7 @@ load_scene :: proc(registry: TypeRegistry) -> Scene {
 
     // Make ship entity
     sentity    := create_entity("Ship01")
-    mesh_args  := make([dynamic]string); append(&mesh_args, "target/assets/ChocolateShip.obj", "target/assets/fries.png")
+    mesh_args  := make([dynamic]string); append(&mesh_args, "target/assets/ChocolateShip.obj", "target/assets/mcStone.png")
     stran_args := make([dynamic]string); append_elems(&stran_args, "50", "0", "0", "0", "0", "0", "1", "1", "1")
     defer delete(mesh_args)
     defer delete(stran_args)

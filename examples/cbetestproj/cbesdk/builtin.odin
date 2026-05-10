@@ -132,8 +132,8 @@ MESH_RENDERER_CONSTRUCTOR :: proc(args: [dynamic]string) -> any {
 
     // Have to put stuff on the heap
     comp := MeshRenderer {
-        mesh_path    = "target/assets/ChocolateShip.obj",
-        texture_path = "target/assets/fries.png",
+        mesh_path    = args[0],
+        texture_path = args[1],
     }
     ptr  := new(MeshRenderer)
     ptr^  = comp
