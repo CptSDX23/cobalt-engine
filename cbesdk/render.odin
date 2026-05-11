@@ -26,7 +26,8 @@ WindowSettings :: struct {
 }
 
 UBO :: struct {
-    mvp: matrix[4,4]f32,
+    vp: matrix[4,4]f32,
+    m:  matrix[4,4]f32,
 }
 
 VertexData :: struct {
@@ -69,19 +70,19 @@ create_render_ctx :: proc(win_settings: WindowSettings) -> (RenderContext, FPSSt
     load_all_shaders(gpu, &shaders)
 
     // Load models
-    models     := make([dynamic]Model)
-    test_model := load_obj_model(gpu, "target/assets/ChocolateShip.obj", "target/assets/fries.png", 1)
-    set_model_transform(&test_model, {0, 0, 25}, {0, ROTATION, 0})
-    set_model_buffers(gpu, &test_model)
-    append(&models, test_model)
-    test_model = load_obj_model(gpu, "target/assets/ChocolateShip.obj", "target/assets/fries.png", 1)
-    set_model_transform(&test_model, {0, 0, 60}, {0, ROTATION, 0})
-    set_model_buffers(gpu, &test_model)
-    append(&models, test_model)
-    test_model = load_obj_model(gpu, "target/assets/ChocolateShip.obj", "target/assets/fries.png", 1)
-    set_model_transform(&test_model, {0, 0, 95}, {0, ROTATION, 0})
-    set_model_buffers(gpu, &test_model)
-    append(&models, test_model)
+    models := make([dynamic]Model)
+    // test_model := load_obj_model(gpu, "target/assets/ChocolateShip.obj", "target/assets/fries.png", 1)
+    // set_model_transform(&test_model, {0, 0, 25}, {0, ROTATION, 0})
+    // set_model_buffers(gpu, &test_model)
+    // append(&models, test_model)
+    // test_model = load_obj_model(gpu, "target/assets/ChocolateShip.obj", "target/assets/fries.png", 1)
+    // set_model_transform(&test_model, {0, 0, 60}, {0, ROTATION, 0})
+    // set_model_buffers(gpu, &test_model)
+    // append(&models, test_model)
+    // test_model = load_obj_model(gpu, "target/assets/ChocolateShip.obj", "target/assets/fries.png", 1)
+    // set_model_transform(&test_model, {0, 0, 95}, {0, ROTATION, 0})
+    // set_model_buffers(gpu, &test_model)
+    // append(&models, test_model)
 
     // Camera (defaults)
     cam := RenderCamera {
@@ -223,7 +224,7 @@ run_render :: proc(ctx: RenderContext, input: ^InputState, fps_state: ^FPSState)
         for model in ctx.models {
 
             model_mat := create_transform_matrix(model.position, model.rotation, false)
-            ubo       := UBO { mvp = proj_mat * view_mat * model_mat }
+            ubo       := UBO { vp = proj_mat * view_mat, m =  model_mat }
 
             sdl.BindGPUVertexBuffers(render_pass, 0, &sdl.GPUBufferBinding { buffer = model.buffers.vertex_buf }, 1)
             sdl.BindGPUIndexBuffer(render_pass, { buffer = model.buffers.index_buf }, ._32BIT)
@@ -351,4 +352,8 @@ set_render_camera :: proc(app: ^Application, render_cam: RenderCamera) {
 
 add_model :: proc(ctx: ^RenderContext, model: Model) {
     append(&ctx.models, model)
+}
+
+set_model :: proc(ctx: ^RenderContext, model: Model, index: i32) {
+    ctx.models[index] = model
 }

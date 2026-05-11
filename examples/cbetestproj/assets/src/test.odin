@@ -9,7 +9,6 @@ import "cobalt:cbesdk"
 TestComponent :: struct {
     value: f32,
 }
-
 test_component_constructor :: proc(args: [dynamic]string) -> any {
 
     if len(args) != 1 {
@@ -21,6 +20,27 @@ test_component_constructor :: proc(args: [dynamic]string) -> any {
     // Have to put stuff on the heap
     comp := TestComponent { value = arg0 }
     ptr  := new(TestComponent)
+    ptr^  = comp
+
+    return ptr^
+
+}
+
+Rotator :: struct {
+    speed: cbesdk.Vector3f
+}
+rotator_constructor :: proc(args: [dynamic]string) -> any {
+
+    if len(args) != 3 {
+        return nil
+    }
+
+    arg0, ok0 := strconv.parse_f32(args[0])
+    arg1, ok1 := strconv.parse_f32(args[1])
+    arg2, ok2 := strconv.parse_f32(args[2])
+
+    comp := Rotator { speed = {arg0, arg1, arg2} }
+    ptr  := new(Rotator)
     ptr^  = comp
 
     return ptr^
@@ -88,10 +108,32 @@ test_system := cbesdk.System {
 
                 cbesdk.write_back_components(scene, cbesdk.Transform, transform_matches, t_indices)
 
-
             }
         }
 
     }
+
+}
+
+rotator_system :: cbesdk.System {
+
+    name   = "RotatorSystem",
+    start  = proc(scene: ^cbesdk.Scene) {},
+    update = proc(scene: ^cbesdk.Scene, deltaTime: f32) {
+
+        rot_matches, r_indices := cbesdk.query_scene_components(scene^, Rotator)
+        rot_uuids              := cbesdk.query_component_uuids(scene^, Rotator)
+
+        for rotator, i in rot_matches {
+
+            transform_matches, t_indices  := cbesdk.query_scene_components_uuid(scene^, cbesdk.Transform, rot_uuids[i])
+            transform_matches[0].rotation += rotator.speed * deltaTime
+
+            cbesdk.write_back_components(scene, cbesdk.Transform, transform_matches, t_indices)
+
+
+        }
+
+    },
 
 }

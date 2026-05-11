@@ -1,8 +1,8 @@
 win_name: CBE Test Proj
-// win_size_x: 1040
-// win_size_y: 650
-win_size_x: 1600
-win_size_y: 1000
+win_size_x: 1040
+win_size_y: 650
+// win_size_x: 1600
+// win_size_y: 1000
 win_col_r: 0
 win_col_g: 0.3
 win_col_b: 0.6

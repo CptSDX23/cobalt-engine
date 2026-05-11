@@ -2,13 +2,16 @@
 [entities]
 CamMover: 1234
 Ship01: 5678
+Ship02: 111
+Teapot01: 222
+//TiltedTower: 333
 
 // Format: - <name>: <uuid> [\n" <arg> ...]
 [components]
 - TestComponent: 1234
 " 42
-- Transform 1234
-" -5
+- Transform: 1234
+" 0
 " 0
 " 0
 " 0
@@ -17,21 +20,68 @@ Ship01: 5678
 " 1
 " 1
 " 1
-- Camera 1234
+- Camera: 1234
 " 60
 " 0.001
 " 10000
 " true
 - MeshRenderer: 5678
 " target/assets/ChocolateShip.obj
+" target/assets/fries.png
+- Transform: 5678
+" 0
+" 0
+" 25
+" 0
+" 0
+" 0
+" 1
+" 1
+" 1
+- MeshRenderer: 111
+" target/assets/ChocolateShip.obj
 " target/assets/mcStone.png
-- Transform 1234
-" 50
+- Transform: 111
 " 0
 " 0
+" 65
 " 0
 " 0
 " 0
 " 1
 " 1
 " 1
+- Rotator: 111
+" 0
+" 15
+" 0
+- MeshRenderer: 222
+" target/assets/teapot.obj
+" target/assets/fries.png
+- Transform: 222
+" 0
+" 0
+" 100
+" 0
+" 0
+" 0
+" 1
+" 1
+" 1
+- Rotator: 222
+" 45
+" 90
+" 0
+//- MeshRenderer: 333
+//" target/assets/tower.obj
+//" target/assets/mcStone.png
+//- Transform: 333
+//" 100
+//" 0
+//" -100
+//" -90
+//" 0
+//" 0
+//" 1
+//" 1
+//" 1

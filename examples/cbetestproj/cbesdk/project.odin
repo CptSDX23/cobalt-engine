@@ -77,7 +77,7 @@ load_settings_from_proj :: proc(proj_path: string) -> ProjectSettings {
             append(&settings.shader_paths, value)
         }
         if key == "scene_path_entry" {
-            append(&settings.shader_paths, value)
+            append(&settings.scene_paths, value)
         }
 
 	}

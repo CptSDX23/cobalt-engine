@@ -3,6 +3,7 @@ package cbesdk
 import "core:fmt"
 import "core:os"
 import "core:strings"
+import "core:strconv"
 
 // Abstracting away things that regular scene interacters should mess with
 Application :: struct {
@@ -14,7 +15,7 @@ Application :: struct {
 
 // Just the state of an ECS
 Scene :: struct {
-    enities:     [dynamic]Entity,
+    entities:    [dynamic]Entity,
     components:  [dynamic]Component,
     systems:     [dynamic]System,
     app_systems: [dynamic]AppSystem,
@@ -145,7 +146,7 @@ write_back_component :: proc(scene: ^Scene, $T: typeid, comp: T, index: i32) {
 }
 
 add_scene_entity :: proc(scene: ^Scene, entity: Entity) {
-    append(&scene.enities, entity)
+    append(&scene.entities, entity)
 }
 
 add_scene_component :: proc(scene: ^Scene, component: Component) {
@@ -180,53 +181,158 @@ load_scene :: proc(registry: TypeRegistry, path: string) -> Scene {
 
     scene := Scene { input_state = InputState {} }
 
-    // Make cam mover entity
-    centity    := create_entity("CamMover")
-    user_args  := make([dynamic]string); append(&user_args, "42")
-    ctran_args := make([dynamic]string); append_elems(&ctran_args, "-5", "0", "0", "0", "0", "0", "1", "1", "1")
-    cam_args   := make([dynamic]string); append_elems(&cam_args, "60", "0.001", "10000", "true")
-    defer delete(user_args)
-    defer delete(ctran_args)
-    defer delete(cam_args)
+    // // Make cam mover entity
+    // centity    := create_entity("CamMover")
+    // user_args  := make([dynamic]string); append(&user_args, "42")
+    // ctran_args := make([dynamic]string); append_elems(&ctran_args, "-5", "0", "0", "0", "0", "0", "1", "1", "1")
+    // cam_args   := make([dynamic]string); append_elems(&cam_args, "60", "0.001", "10000", "true")
+    // defer delete(user_args)
+    // defer delete(ctran_args)
+    // defer delete(cam_args)
 
-    // Bind component generated from constructor
-    user_struct  := registry.constructors["TestComponent"](user_args)
-    ctran_struct := registry.constructors["Transform"](ctran_args)
-    cam_struct   := registry.constructors["Camera"](cam_args)
-    bind_entity_component(&scene, centity, create_component(user_struct))
-    bind_entity_component(&scene, centity, create_component(ctran_struct))
-    bind_entity_component(&scene, centity, create_component(cam_struct))
-    add_scene_entity(&scene, centity)
+    // // Bind component generated from constructor
+    // user_struct  := registry.constructors["TestComponent"](user_args)
+    // ctran_struct := registry.constructors["Transform"](ctran_args)
+    // cam_struct   := registry.constructors["Camera"](cam_args)
+    // bind_entity_component(&scene, centity, create_component(user_struct))
+    // bind_entity_component(&scene, centity, create_component(ctran_struct))
+    // bind_entity_component(&scene, centity, create_component(cam_struct))
+    // add_scene_entity(&scene, centity)
 
-    // Make ship entity
-    sentity    := create_entity("Ship01")
-    mesh_args  := make([dynamic]string); append(&mesh_args, "target/assets/ChocolateShip.obj", "target/assets/mcStone.png")
-    stran_args := make([dynamic]string); append_elems(&stran_args, "50", "0", "0", "0", "0", "0", "1", "1", "1")
-    defer delete(mesh_args)
-    defer delete(stran_args)
+    // // Make ship entity
+    // sentity    := create_entity("Ship01")
+    // mesh_args  := make([dynamic]string); append(&mesh_args, "target/assets/ChocolateShip.obj", "target/assets/mcStone.png")
+    // stran_args := make([dynamic]string); append_elems(&stran_args, "50", "0", "0", "0", "0", "0", "1", "1", "1")
+    // defer delete(mesh_args)
+    // defer delete(stran_args)
 
-    // Bind component generated from constructor
-    mesh_struct  := registry.constructors["MeshRenderer"](mesh_args)
-    stran_struct := registry.constructors["Transform"](stran_args)
-    bind_entity_component(&scene, sentity, create_component(mesh_struct))
-    bind_entity_component(&scene, sentity, create_component(stran_struct))
-    add_scene_entity(&scene, sentity)
+    // // Bind component generated from constructor
+    // mesh_struct  := registry.constructors["MeshRenderer"](mesh_args)
+    // stran_struct := registry.constructors["Transform"](stran_args)
+    // bind_entity_component(&scene, sentity, create_component(mesh_struct))
+    // bind_entity_component(&scene, sentity, create_component(stran_struct))
+    // add_scene_entity(&scene, sentity)
 
-    // Systems
-    user_system := registry.systems["TestSystem"]
-    cam_system  := registry.app_systems["CameraSystem"]
-    mesh_system := registry.app_systems["MeshRendererSystem"]
-    add_scene_system(&scene, user_system)
-    add_scene_app_system(&scene, cam_system)
-    add_scene_app_system(&scene, mesh_system)
+    // // Systems
+    // user_system := registry.systems["TestSystem"]
+    // cam_system  := registry.app_systems["CameraSystem"]
+    // mesh_system := registry.app_systems["MeshRendererSystem"]
+    // add_scene_system(&scene, user_system)
+    // add_scene_app_system(&scene, cam_system)
+    // add_scene_app_system(&scene, mesh_system)
+
+    // Add Systems
+    for _, system in registry.systems {
+        add_scene_system(&scene, system)
+    }
+    for _, app_system in registry.app_systems {
+        add_scene_app_system(&scene, app_system)
+    }
 
     // Read file
-    // data, err := os.read_entire_file(path, context.allocator)
+    data, err := os.read_entire_file(path, context.allocator)
     
-    // if err != nil {
-    //     fmt.println("Failed to read scene file")
-    //     return scene
-    // }
+    if err != nil {
+        fmt.println("Failed to read scene file")
+        return scene
+    }
+
+    ParseState :: enum { NONE, ENTITY, COMPONENT, }
+    state := ParseState.NONE
+    lines := string(data)
+
+    parsing_args      := false
+    current_comp_name := ""
+    current_comp_uuid := i128(0)
+    current_comp_args := make([dynamic]string)
+    defer delete(current_comp_args)
+
+	for line in strings.split_lines_iterator(&lines) {
+
+        if strings.starts_with(line, "//") {
+            continue
+        }
+
+        // Check state
+        if strings.starts_with(line, "[entities]") {
+            state = .ENTITY
+            continue
+        }
+        if strings.starts_with(line, "[components]") {
+            state = .COMPONENT
+            continue 
+        }
+
+        if state == .NONE {
+            continue
+        }
+
+        // Entity parsing
+        if state == .ENTITY {
+
+            split := strings.split(line, ":")
+            if (len(split) != 2) {
+                continue
+            }
+            key       := strings.trim_space(split[0])
+            value, ok := strconv.parse_i128(strings.trim_space(split[1]))
+
+            entity := create_entity_uuid(key, value)
+            add_scene_entity(&scene, entity)
+
+        }
+
+        // Component parsing
+        if state == .COMPONENT {
+
+            // Component metadata
+            if strings.starts_with(line, "- ") {
+
+                // If a component was being parsed, finish it
+                if parsing_args {
+
+                    parsing_args  = false
+                    data_struct  := registry.constructors[current_comp_name](current_comp_args)
+                    add_scene_component(&scene, create_component_uuid(data_struct, current_comp_uuid))
+                    clear(&current_comp_args)
+
+                }
+
+                split := strings.split(line[2:], ":")
+                if (len(split) != 2) {
+                    current_comp_name = ""
+                    current_comp_uuid = 0
+                    continue
+                }
+                key       := strings.trim_space(split[0])
+                value, ok := strconv.parse_i128(strings.trim_space(split[1]))
+
+                current_comp_name = key
+                current_comp_uuid = value
+
+            }
+
+            // Component args
+            if strings.starts_with(line, "\" ") {
+
+                parsing_args = true
+                append(&current_comp_args, line[2:])
+
+            }
+
+        }
+
+    }
+
+    // One final check
+    if parsing_args {
+
+        parsing_args  = false
+        data_struct  := registry.constructors[current_comp_name](current_comp_args)
+        add_scene_component(&scene, create_component_uuid(data_struct, current_comp_uuid))
+        clear(&current_comp_args)
+
+    }
 
     return scene
 
@@ -248,7 +354,7 @@ create_application :: proc(registry: ^TypeRegistry, abs_proj_path: string) -> Ap
     render_ctx, fps_state := create_render_ctx(settings.win_settings)
 
     return Application {
-        scene      = load_scene(registry^, strings.concatenate({abs_proj_path, "\\", settings.scene_paths[0]})),
+        scene      = load_scene(registry^, strings.concatenate({abs_proj_path, "\\assets\\", settings.scene_paths[0]})),
         registry   = registry^,
         render_ctx = render_ctx,
         fps_state  = fps_state,

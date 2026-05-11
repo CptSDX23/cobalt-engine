@@ -82,12 +82,19 @@ load_obj_mesh :: proc(path: string) -> Mesh {
     for index, i in face_indices {
 
         for j in 0..<3 {
+
+            uv := Vector2f {0, 0}
+            if len(vert_uvs) > 0 {
+                uv = vert_uvs[index.uvs[j]]
+            }
+
             append(&final_verts, VertexData {
                 pos = vert_poses[index.poses[j]],
                 col = {1, 1, 1, 1},
-                uv  = vert_uvs[index.uvs[j]],
+                uv  = uv,
             })
             append(&final_indices, u32(i * 3 + j))
+
         }
 
     }
@@ -230,13 +237,19 @@ parse_face_index :: proc(parts: []string) -> FaceIndex {
 
     for i in 1..=3 {
         indices := strings.split(parts[i], "/")
-        if (len(indices) < 2) {
+        if len(indices) < 1 {
             return index
         }
-        val, ok := strconv.parse_uint(indices[0])
-        poses[i - 1] = u32(val) - 1
-        val, ok = strconv.parse_uint(indices[1])
-        uvs[i - 1] = u32(val) - 1
+        if len(indices) < 2 {
+            val, ok := strconv.parse_uint(indices[0])
+            poses[i - 1] = u32(val) - 1
+        }
+        if len(indices) >= 2 {
+            val, ok := strconv.parse_uint(indices[0])
+            poses[i - 1] = u32(val) - 1
+            val, ok = strconv.parse_uint(indices[1])
+            uvs[i - 1] = u32(val) - 1
+        }
     }
 
     index.poses = poses

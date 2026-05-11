@@ -46,6 +46,10 @@ compile_proj_shaders :: proc(settings: cbesdk.ProjectSettings) {
                 fmt.eprintln("Error building shaders:", err_p)
                 return
             }
+            if len(stderr) > 0 {
+                fmt.println("Errors building shader ", path)
+                fmt.print(string(stderr))
+            }
 
         }
 

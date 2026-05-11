@@ -44,6 +44,15 @@ create_entity :: proc(name: string) -> Entity {
 
 }
 
+create_entity_uuid :: proc(name: string, uuid: i128) -> Entity {
+
+    return Entity {
+        uuid = uuid,
+        name = name,
+    }
+
+}
+
 create_component :: proc(data: any) -> Component {
 
     // Try to get the name of the struct through reflection
@@ -55,6 +64,24 @@ create_component :: proc(data: any) -> Component {
 
     return Component {
         entity_uuid = 0,
+        name        = name,
+        enabled     = true,
+        data        = data,
+    }
+
+}
+
+create_component_uuid :: proc(data: any, uuid: i128) -> Component {
+
+    // Try to get the name of the struct through reflection
+    info := type_info_of(data.id)
+    name := ""
+    if named, ok := info.variant.(reflect.Type_Info_Named); ok {
+        name = named.name
+    }
+
+    return Component {
+        entity_uuid = uuid,
         name        = name,
         enabled     = true,
         data        = data,

@@ -161,6 +161,22 @@ MESH_RENDERER_APP_SYSTEM :: AppSystem {
         }
 
     },
-    update = proc(scene: ^Scene, app: ^Application, deltaTime: f32) {},
+    update = proc(scene: ^Scene, app: ^Application, deltaTime: f32) {
+
+        mesh_matches, m_indices := query_scene_components(scene^, MeshRenderer)
+        mesh_uuids              := query_component_uuids(scene^, MeshRenderer)
+
+        // this is hacky
+        for mesh, i in mesh_matches {
+
+            transform_matches, t_indices := query_scene_components_uuid(scene^, Transform, mesh_uuids[i])
+
+            model := app.render_ctx.models[i]
+            set_model_transform(&model, transform_matches[0].position, transform_matches[0].rotation)
+            set_model(&app.render_ctx, model, i32(i))
+
+        }
+
+    },
 
 }
