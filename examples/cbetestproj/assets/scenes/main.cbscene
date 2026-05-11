@@ -1,0 +1,37 @@
+// Format: <name>: <uuid>
+[entities]
+CamMover: 1234
+Ship01: 5678
+
+// Format: - <name>: <uuid> [\n" <arg> ...]
+[components]
+- TestComponent: 1234
+" 42
+- Transform 1234
+" -5
+" 0
+" 0
+" 0
+" 0
+" 0
+" 1
+" 1
+" 1
+- Camera 1234
+" 60
+" 0.001
+" 10000
+" true
+- MeshRenderer: 5678
+" target/assets/ChocolateShip.obj
+" target/assets/mcStone.png
+- Transform 1234
+" 50
+" 0
+" 0
+" 0
+" 0
+" 0
+" 1
+" 1
+" 1

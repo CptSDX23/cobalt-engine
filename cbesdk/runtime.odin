@@ -1,6 +1,8 @@
 package cbesdk
 
 import "core:fmt"
+import "core:os"
+import "core:strings"
 
 // Abstracting away things that regular scene interacters should mess with
 Application :: struct {
@@ -174,7 +176,7 @@ bind_entity_component :: proc(scene: ^Scene, entity: Entity, component: Componen
 }
 
 // Hardcoded for now
-load_scene :: proc(registry: TypeRegistry) -> Scene {
+load_scene :: proc(registry: TypeRegistry, path: string) -> Scene {
 
     scene := Scene { input_state = InputState {} }
 
@@ -218,6 +220,14 @@ load_scene :: proc(registry: TypeRegistry) -> Scene {
     add_scene_app_system(&scene, cam_system)
     add_scene_app_system(&scene, mesh_system)
 
+    // Read file
+    // data, err := os.read_entire_file(path, context.allocator)
+    
+    // if err != nil {
+    //     fmt.println("Failed to read scene file")
+    //     return scene
+    // }
+
     return scene
 
 }
@@ -238,7 +248,7 @@ create_application :: proc(registry: ^TypeRegistry, abs_proj_path: string) -> Ap
     render_ctx, fps_state := create_render_ctx(settings.win_settings)
 
     return Application {
-        scene      = load_scene(registry^),
+        scene      = load_scene(registry^, strings.concatenate({abs_proj_path, "\\", settings.scene_paths[0]})),
         registry   = registry^,
         render_ctx = render_ctx,
         fps_state  = fps_state,

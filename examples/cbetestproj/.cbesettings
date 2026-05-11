@@ -9,3 +9,4 @@ win_col_b: 0.6
 odin_main_path: src\
 shader_path_entry: shaders\frag_shader.glsl.frag
 shader_path_entry: shaders\vert_shader.glsl.vert
+scene_path_entry: scenes\main.cbscene
