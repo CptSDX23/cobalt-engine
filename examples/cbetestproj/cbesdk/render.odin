@@ -30,10 +30,19 @@ UBO :: struct {
     m:  matrix[4,4]f32,
 }
 
+// Must be packed in this order so that shader will work
+Lights :: struct {
+    lightColor:     Vector3f,
+    lightIntensity: f32,
+    lightPosition:  Vector3f,
+    lightAmbient:   f32,
+}
+
 VertexData :: struct {
-    pos: Vector3f,
-    col: sdl.FColor,
-    uv:  Vector2f,
+    pos:    Vector3f,
+    col:    sdl.FColor,
+    uv:     Vector2f,
+    normal: Vector3f,
 }
 
 Texture :: struct {
@@ -116,13 +125,15 @@ create_render_ctx :: proc(win_settings: WindowSettings) -> (RenderContext, FPSSt
                 slot  = 0,
                 pitch = size_of(VertexData)
             },
-            num_vertex_attributes = 3,
+            num_vertex_attributes = 4,
             vertex_attributes     = raw_data([]sdl.GPUVertexAttribute {
                 { location = 0, format = .FLOAT3, offset = u32(offset_of(VertexData, pos)) },
                 { location = 1, format = .FLOAT4, offset = u32(offset_of(VertexData, col)) },
                 { location = 2, format = .FLOAT2, offset = u32(offset_of(VertexData, uv)) },
+                { location = 3, format = .FLOAT3, offset = u32(offset_of(VertexData, normal)) },
             }),
         },
+        
         target_info = {
             num_color_targets         = 1,
             has_depth_stencil_target  = true,
@@ -204,6 +215,15 @@ run_render :: proc(ctx: RenderContext, input: ^InputState, fps_state: ^FPSState)
         proj_mat := linalg.matrix4_perspective_f32(linalg.to_radians(ctx.camera.fov), f32(win_size.x) / f32(win_size.y), ctx.camera.clipping_planes.x, ctx.camera.clipping_planes.y, false)
         view_mat := linalg.matrix4_look_at_f32(ctx.camera.position, ctx.camera.position + ctx.camera.forward, {0, 1, 0})
 
+        // Light uniform buffer
+        lights := Lights {
+            lightColor     = {1, 1, 1},
+            lightIntensity = 1,
+            lightPosition  = {0, 10, 65},
+            lightAmbient   = 0.1,
+        }
+        sdl.PushGPUFragmentUniformData(cmd_buf, 0, &lights, size_of(lights))
+
         // Draw passes
         color_target := sdl.GPUColorTargetInfo {
             texture     = swapchain,
@@ -249,7 +269,8 @@ run_render :: proc(ctx: RenderContext, input: ^InputState, fps_state: ^FPSState)
 // Scans target directory for .spv files
 load_all_shaders :: proc(gpu: ^sdl.GPUDevice, shaders: ^[dynamic]^sdl.GPUShader) {
 
-    // Hardcoded for now
+    // Hardcoded for now, this is bad because of no reflection and god why did i spend so
+    // long remembering i had to change the number of ubos
     vert_code, err_v := os.read_entire_file("target/assets/vert_shader.spv.vert", context.allocator)
     if err_v != nil {
         fmt.printfln("Failed to load vert shader from compiled file: %v", err_v)
@@ -263,7 +284,7 @@ load_all_shaders :: proc(gpu: ^sdl.GPUDevice, shaders: ^[dynamic]^sdl.GPUShader)
         fmt.printfln("Failed to load frag shader from compiled file: %v", err_f)
         return
     }
-    append(shaders, load_shader(gpu, frag_code, .FRAGMENT, 0, 1))
+    append(shaders, load_shader(gpu, frag_code, .FRAGMENT, 1, 1))
 
 }
 

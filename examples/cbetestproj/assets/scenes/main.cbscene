@@ -22,7 +22,7 @@ Teapot01: 222
 " 1
 - Camera: 1234
 " 60
-" 0.001
+" 0.01
 " 10000
 " true
 - MeshRenderer: 5678
@@ -69,7 +69,7 @@ Teapot01: 222
 " 1
 " 1
 - Rotator: 222
-" 45
+" 40
 " 90
 " 0
 //- MeshRenderer: 333

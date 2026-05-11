@@ -27,8 +27,9 @@ ModelBufferInfo :: struct {
 }
 
 FaceIndex :: struct {
-    poses: [3]u32,
-    uvs:   [3]u32,
+    poses:   [3]u32,
+    uvs:     [3]u32,
+    normals: [3]u32,
 }
 
 load_obj_mesh :: proc(path: string) -> Mesh {
@@ -37,10 +38,12 @@ load_obj_mesh :: proc(path: string) -> Mesh {
     vert_poses   := make([dynamic]Vector3f)
     vert_cols    := make([dynamic]sdl.FColor)
     vert_uvs     := make([dynamic]Vector2f)
+    vert_normals := make([dynamic]Vector3f)
     face_indices := make([dynamic]FaceIndex)
     defer delete(vert_poses)
     defer delete(vert_cols)
     defer delete(vert_uvs)
+    defer delete(vert_normals)
     defer delete(face_indices)
 
     // Read file
@@ -67,6 +70,8 @@ load_obj_mesh :: proc(path: string) -> Mesh {
                 append(&vert_poses, parse_vert_pos(parts))
             case "vt":
                 append(&vert_uvs, parse_vert_uv(parts))
+            case "vn":
+                append(&vert_normals, parse_vert_normal(parts))
             case "f":
                 append(&face_indices, parse_face_index(parts))
 
@@ -83,15 +88,21 @@ load_obj_mesh :: proc(path: string) -> Mesh {
 
         for j in 0..<3 {
 
-            uv := Vector2f {0, 0}
+            // Because some might be missing
+            uv     := Vector2f {0, 0}
+            normal := Vector3f {0, 0, 0}
             if len(vert_uvs) > 0 {
                 uv = vert_uvs[index.uvs[j]]
             }
+            if len(vert_normals) > 0 {
+                normal = vert_normals[index.normals[j]]
+            }
 
             append(&final_verts, VertexData {
-                pos = vert_poses[index.poses[j]],
-                col = {1, 1, 1, 1},
-                uv  = uv,
+                pos    = vert_poses[index.poses[j]],
+                col    = {1, 1, 1, 1},
+                uv     = uv,
+                normal = normal,
             })
             append(&final_indices, u32(i * 3 + j))
 
@@ -225,11 +236,29 @@ parse_vert_uv :: proc(parts: []string) -> Vector2f {
 
 }
 
+parse_vert_normal :: proc(parts: []string) -> Vector3f {
+
+    if (len(parts) < 4) {
+        return {0, 0, 0}
+    }
+
+    val, ok := strconv.parse_f32(parts[1])
+    x := val
+    val, ok = strconv.parse_f32(parts[2])
+    y := val
+    val, ok = strconv.parse_f32(parts[3])
+    z := val
+
+    return {x, y, z}
+
+}
+
 parse_face_index :: proc(parts: []string) -> FaceIndex {
 
-    index := FaceIndex {}
-    poses := [3]u32{0, 0, 0}
-    uvs   := [3]u32{0, 0, 0}
+    index   := FaceIndex {}
+    poses   := [3]u32{0, 0, 0}
+    uvs     := [3]u32{0, 0, 0}
+    normals := [3]u32{0, 0, 0}
 
     if (len(parts) != 4) {
         return index
@@ -244,16 +273,25 @@ parse_face_index :: proc(parts: []string) -> FaceIndex {
             val, ok := strconv.parse_uint(indices[0])
             poses[i - 1] = u32(val) - 1
         }
-        if len(indices) >= 2 {
+        if len(indices) < 3 {
             val, ok := strconv.parse_uint(indices[0])
             poses[i - 1] = u32(val) - 1
             val, ok = strconv.parse_uint(indices[1])
             uvs[i - 1] = u32(val) - 1
         }
+        if len(indices) >= 3 {
+            val, ok := strconv.parse_uint(indices[0])
+            poses[i - 1] = u32(val) - 1
+            val, ok = strconv.parse_uint(indices[1])
+            uvs[i - 1] = u32(val) - 1
+            val, ok = strconv.parse_uint(indices[2])
+            normals[i - 1] = u32(val) - 1
+        }
     }
 
-    index.poses = poses
-    index.uvs   = uvs
+    index.poses   = poses
+    index.uvs     = uvs
+    index.normals = normals
 
     return index
 

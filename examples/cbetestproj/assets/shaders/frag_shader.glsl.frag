@@ -1,9 +1,16 @@
 #version 460
 
+layout(set = 3, binding = 0) uniform lights {
+    vec3  lightColor;
+    float lightIntensity;
+    vec3  lightPosition;
+    float lightAmbient;
+};
+
 layout(location = 0) in vec4 color;
 layout(location = 1) in vec2 uv;
 layout(location = 2) in vec3 position;
-// layout(location = 3) in vec3 normal;
+layout(location = 3) in vec3 normal;
 
 layout(location = 0) out vec4 frag_color;
 
@@ -22,21 +29,22 @@ void main() {
     // frag_color = final;
 
     // Temp Lighting
-    vec3  lightColor     = vec3(1, 1, 1);
-    float lightIntensity = 1;
-    vec3  lightPosition  = vec3(0, 10, 40);
+    // vec3  lightColor     = vec3(1, 1, 1);
+    // float lightIntensity = 1;
+    // float lightAmbient   = 0.05;
+    // vec3  lightPosition  = vec3(0, 10, 65);
 
     // Relation to light
     vec3  vecToLight    = lightPosition - position;
     float distToLight   = length(vecToLight);
     vec3  dirToLight    = vecToLight / distToLight;
-    vec3  surfaceNormal = normalize(vec3(0, 1, 0));
+    vec3  surfaceNormal = normalize(normal);
 
     // Angle of reflection
     vec3  incoming      = lightColor * lightIntensity;
     float incomingAngle = dot(dirToLight, surfaceNormal);
-    //float attenuation   = 1 / (distToLight * distToLight);
-    float attenuation   = 1;
+    float attenuation   = 1 / ((distToLight) * 0.05);
+    //float attenuation   = 1;
     vec3  irradiance    = incoming * incomingAngle * attenuation;
 
     // Reflection
@@ -46,11 +54,17 @@ void main() {
     if (incomingAngle <= 0) {
         reflected = vec3(0, 0, 0);
     }
+    // if (length(reflected) < lightAmbient) {
+    //     reflected = lightColor * lightAmbient;
+    // }
+    reflected = max(reflected, lightColor * lightAmbient);
 
     // Emision
     vec3 emmited = vec3(0, 0, 0);
 
-    vec3 total = emmited + reflected;
-    frag_color = vec4(total, 1);
+    vec4 total = vec4(emmited + reflected, 1) * texture(tex_sampler, uv);
+    //total = vec4(surfaceNormal, 1);
+    //total = vec4(length(reflected), length(reflected), length(reflected), 1);
+    frag_color = total;
 
 }
