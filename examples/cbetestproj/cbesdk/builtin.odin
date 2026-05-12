@@ -154,7 +154,7 @@ MESH_RENDERER_APP_SYSTEM :: AppSystem {
             transform_matches, t_indices := query_scene_components_uuid(scene^, Transform, mesh_uuids[i])
 
             model := load_obj_model(app.render_ctx.gpu, mesh.mesh_path, mesh.texture_path, 1)
-            set_model_transform(&model, transform_matches[0].position, transform_matches[0].rotation)
+            set_model_transform(&model, transform_matches[0].position, transform_matches[0].rotation, transform_matches[0].scale)
             set_model_buffers(app.render_ctx.gpu, &model)
             add_model(&app.render_ctx, model)
 
@@ -172,7 +172,7 @@ MESH_RENDERER_APP_SYSTEM :: AppSystem {
             transform_matches, t_indices := query_scene_components_uuid(scene^, Transform, mesh_uuids[i])
 
             model := app.render_ctx.models[i]
-            set_model_transform(&model, transform_matches[0].position, transform_matches[0].rotation)
+            set_model_transform(&model, transform_matches[0].position, transform_matches[0].rotation, transform_matches[0].scale)
             set_model(&app.render_ctx, model, i32(i))
 
         }

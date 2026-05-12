@@ -54,16 +54,14 @@ void main() {
     if (incomingAngle <= 0) {
         reflected = vec3(0, 0, 0);
     }
-    // if (length(reflected) < lightAmbient) {
-    //     reflected = lightColor * lightAmbient;
-    // }
     reflected = max(reflected, lightColor * lightAmbient);
 
     // Emision
     vec3 emmited = vec3(0, 0, 0);
 
-    vec4 total = vec4(emmited + reflected, 1) * texture(tex_sampler, uv);
+    vec4 total = vec4(reflected, 1) * texture(tex_sampler, uv) + vec4(emmited, 1);
     //total = vec4(surfaceNormal, 1);
+    //total = vec4(uv.x, uv.y, 0, 1);
     //total = vec4(length(reflected), length(reflected), length(reflected), 1);
     frag_color = total;
 

@@ -19,6 +19,7 @@ Model :: struct {
     buffers:  ModelBufferInfo,
     position: Vector3f,
     rotation: Vector3f,
+    scale:    Vector3f,
 }
 
 ModelBufferInfo :: struct {
@@ -196,10 +197,11 @@ set_model_buffers :: proc(gpu: ^sdl.GPUDevice, model: ^Model) {
 
 }
 
-set_model_transform :: proc(model: ^Model, pos: Vector3f, rot: Vector3f) {
+set_model_transform :: proc(model: ^Model, pos: Vector3f, rot: Vector3f, scale: Vector3f) {
 
     model.position = pos
     model.rotation = rot
+    model.scale    = scale
 
 }
 

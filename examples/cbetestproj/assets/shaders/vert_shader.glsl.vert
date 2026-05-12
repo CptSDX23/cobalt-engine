@@ -3,6 +3,7 @@
 layout(set = 1, binding = 0) uniform ubo {
     mat4 vp;
     mat4 m;
+    mat4 n;
 };
 
 layout(location = 0) in vec3 position;
@@ -23,7 +24,7 @@ void main() {
     out_color  = color;
     out_uv     = uv;
     out_pos    = vec3(m * pos);
-    out_normal = normalize((m * vec4(normal, 0)).xyz);
+    out_normal = normalize((n * vec4(normal, 0)).xyz);
     //out_normal = normal;
     
 }

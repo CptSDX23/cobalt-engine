@@ -25,17 +25,18 @@ WindowSettings :: struct {
     clear_col: [4]f32,
 }
 
-UBO :: struct {
-    vp: matrix[4,4]f32,
-    m:  matrix[4,4]f32,
+ProjUBO :: struct {
+    view_proj_mat: matrix[4,4]f32,
+    model_mat:     matrix[4,4]f32,
+    normal_mat:    matrix[4,4]f32,
 }
 
 // Must be packed in this order so that shader will work
-Lights :: struct {
-    lightColor:     Vector3f,
-    lightIntensity: f32,
-    lightPosition:  Vector3f,
-    lightAmbient:   f32,
+LightUBO :: struct {
+    light_color:     Vector3f,
+    light_intensity: f32,
+    light_position:  Vector3f,
+    light_ambient:   f32,
 }
 
 VertexData :: struct {
@@ -216,11 +217,11 @@ run_render :: proc(ctx: RenderContext, input: ^InputState, fps_state: ^FPSState)
         view_mat := linalg.matrix4_look_at_f32(ctx.camera.position, ctx.camera.position + ctx.camera.forward, {0, 1, 0})
 
         // Light uniform buffer
-        lights := Lights {
-            lightColor     = {1, 1, 1},
-            lightIntensity = 1,
-            lightPosition  = {0, 10, 65},
-            lightAmbient   = 0.1,
+        lights := LightUBO {
+            light_color     = {1, 1, 1},
+            light_intensity = 1,
+            light_position  = {0, 10, 60},
+            light_ambient   = 0.05,
         }
         sdl.PushGPUFragmentUniformData(cmd_buf, 0, &lights, size_of(lights))
 
@@ -243,12 +244,16 @@ run_render :: proc(ctx: RenderContext, input: ^InputState, fps_state: ^FPSState)
         // Draw commands
         for model in ctx.models {
 
-            model_mat := create_transform_matrix(model.position, model.rotation, false)
-            ubo       := UBO { vp = proj_mat * view_mat, m =  model_mat }
+            model_mat := create_transform_matrix(model.position, model.rotation, model.scale)
+            projs     := ProjUBO {
+                view_proj_mat = proj_mat * view_mat, 
+                model_mat     = model_mat,
+                normal_mat    = linalg.inverse_transpose(model_mat),
+            }
 
             sdl.BindGPUVertexBuffers(render_pass, 0, &sdl.GPUBufferBinding { buffer = model.buffers.vertex_buf }, 1)
             sdl.BindGPUIndexBuffer(render_pass, { buffer = model.buffers.index_buf }, ._32BIT)
-            sdl.PushGPUVertexUniformData(cmd_buf, 0, &ubo, size_of(ubo))
+            sdl.PushGPUVertexUniformData(cmd_buf, 0, &projs, size_of(projs))
             sdl.BindGPUFragmentSamplers(render_pass, 0, &sdl.GPUTextureSamplerBinding {
                 texture = model.texture.tex,
                 sampler = model.texture.sampler,
@@ -330,25 +335,15 @@ load_texture :: proc(gpu: ^sdl.GPUDevice, path: cstring, flip: i32) -> Texture {
 
 }
 
-create_transform_matrix :: proc(pos: [3]f32, rot: [3]f32, flip: bool) -> matrix[4,4]f32 {
+create_transform_matrix :: proc(pos: Vector3f, rot: Vector3f, scale: Vector3f) -> matrix[4,4]f32 {
 
     transform_mat: matrix[4,4]f32
 
-    if (!flip) {
-
-        transform_mat = linalg.matrix4_translate_f32(pos)
-        transform_mat = transform_mat * linalg.matrix4_rotate_f32(linalg.to_radians(rot.x), {1, 0, 0})
-        transform_mat = transform_mat * linalg.matrix4_rotate_f32(linalg.to_radians(rot.y), {0, 1, 0})
-        transform_mat = transform_mat * linalg.matrix4_rotate_f32(linalg.to_radians(rot.z), {0, 0, 1})
-
-    } else {
-
-        transform_mat = linalg.matrix4_translate_f32(-pos)
-        transform_mat = transform_mat * linalg.matrix4_rotate_f32(-linalg.to_radians(rot.x), {1, 0, 0})
-        transform_mat = transform_mat * linalg.matrix4_rotate_f32(-linalg.to_radians(rot.y), {0, 1, 0})
-        transform_mat = transform_mat * linalg.matrix4_rotate_f32(-linalg.to_radians(rot.z), {0, 0, 1})
-
-    }
+    transform_mat = linalg.matrix4_translate_f32(pos)
+    transform_mat = transform_mat * linalg.matrix4_rotate_f32(linalg.to_radians(rot.x), {1, 0, 0})
+    transform_mat = transform_mat * linalg.matrix4_rotate_f32(linalg.to_radians(rot.y), {0, 1, 0})
+    transform_mat = transform_mat * linalg.matrix4_rotate_f32(linalg.to_radians(rot.z), {0, 0, 1})
+    transform_mat = transform_mat * linalg.matrix4_scale_f32(scale)
 
     return transform_mat
 
