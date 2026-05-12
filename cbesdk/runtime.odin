@@ -181,46 +181,6 @@ load_scene :: proc(registry: TypeRegistry, path: string) -> Scene {
 
     scene := Scene { input_state = InputState {} }
 
-    // // Make cam mover entity
-    // centity    := create_entity("CamMover")
-    // user_args  := make([dynamic]string); append(&user_args, "42")
-    // ctran_args := make([dynamic]string); append_elems(&ctran_args, "-5", "0", "0", "0", "0", "0", "1", "1", "1")
-    // cam_args   := make([dynamic]string); append_elems(&cam_args, "60", "0.001", "10000", "true")
-    // defer delete(user_args)
-    // defer delete(ctran_args)
-    // defer delete(cam_args)
-
-    // // Bind component generated from constructor
-    // user_struct  := registry.constructors["TestComponent"](user_args)
-    // ctran_struct := registry.constructors["Transform"](ctran_args)
-    // cam_struct   := registry.constructors["Camera"](cam_args)
-    // bind_entity_component(&scene, centity, create_component(user_struct))
-    // bind_entity_component(&scene, centity, create_component(ctran_struct))
-    // bind_entity_component(&scene, centity, create_component(cam_struct))
-    // add_scene_entity(&scene, centity)
-
-    // // Make ship entity
-    // sentity    := create_entity("Ship01")
-    // mesh_args  := make([dynamic]string); append(&mesh_args, "target/assets/ChocolateShip.obj", "target/assets/mcStone.png")
-    // stran_args := make([dynamic]string); append_elems(&stran_args, "50", "0", "0", "0", "0", "0", "1", "1", "1")
-    // defer delete(mesh_args)
-    // defer delete(stran_args)
-
-    // // Bind component generated from constructor
-    // mesh_struct  := registry.constructors["MeshRenderer"](mesh_args)
-    // stran_struct := registry.constructors["Transform"](stran_args)
-    // bind_entity_component(&scene, sentity, create_component(mesh_struct))
-    // bind_entity_component(&scene, sentity, create_component(stran_struct))
-    // add_scene_entity(&scene, sentity)
-
-    // // Systems
-    // user_system := registry.systems["TestSystem"]
-    // cam_system  := registry.app_systems["CameraSystem"]
-    // mesh_system := registry.app_systems["MeshRendererSystem"]
-    // add_scene_system(&scene, user_system)
-    // add_scene_app_system(&scene, cam_system)
-    // add_scene_app_system(&scene, mesh_system)
-
     // Add Systems
     for _, system in registry.systems {
         add_scene_system(&scene, system)
@@ -237,6 +197,7 @@ load_scene :: proc(registry: TypeRegistry, path: string) -> Scene {
         return scene
     }
 
+    // Parse the scene
     ParseState :: enum { NONE, ENTITY, COMPONENT, }
     state := ParseState.NONE
     lines := string(data)

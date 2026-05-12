@@ -37,6 +37,13 @@ LightUBO :: struct {
     light_intensity: f32,
     light_position:  Vector3f,
     light_ambient:   f32,
+    cam_position:    Vector3f,
+}
+
+MaterialUBO :: struct {
+    diffuse_color:  Vector3f,
+    shininess:      f32,
+    specular_color: Vector3f,
 }
 
 VertexData :: struct {
@@ -81,18 +88,6 @@ create_render_ctx :: proc(win_settings: WindowSettings) -> (RenderContext, FPSSt
 
     // Load models
     models := make([dynamic]Model)
-    // test_model := load_obj_model(gpu, "target/assets/ChocolateShip.obj", "target/assets/fries.png", 1)
-    // set_model_transform(&test_model, {0, 0, 25}, {0, ROTATION, 0})
-    // set_model_buffers(gpu, &test_model)
-    // append(&models, test_model)
-    // test_model = load_obj_model(gpu, "target/assets/ChocolateShip.obj", "target/assets/fries.png", 1)
-    // set_model_transform(&test_model, {0, 0, 60}, {0, ROTATION, 0})
-    // set_model_buffers(gpu, &test_model)
-    // append(&models, test_model)
-    // test_model = load_obj_model(gpu, "target/assets/ChocolateShip.obj", "target/assets/fries.png", 1)
-    // set_model_transform(&test_model, {0, 0, 95}, {0, ROTATION, 0})
-    // set_model_buffers(gpu, &test_model)
-    // append(&models, test_model)
 
     // Camera (defaults)
     cam := RenderCamera {
@@ -222,6 +217,7 @@ run_render :: proc(ctx: RenderContext, input: ^InputState, fps_state: ^FPSState)
             light_intensity = 1,
             light_position  = {0, 10, 60},
             light_ambient   = 0.05,
+            cam_position    = ctx.camera.position,
         }
         sdl.PushGPUFragmentUniformData(cmd_buf, 0, &lights, size_of(lights))
 
@@ -250,10 +246,12 @@ run_render :: proc(ctx: RenderContext, input: ^InputState, fps_state: ^FPSState)
                 model_mat     = model_mat,
                 normal_mat    = linalg.inverse_transpose(model_mat),
             }
+            material := model.material
 
             sdl.BindGPUVertexBuffers(render_pass, 0, &sdl.GPUBufferBinding { buffer = model.buffers.vertex_buf }, 1)
             sdl.BindGPUIndexBuffer(render_pass, { buffer = model.buffers.index_buf }, ._32BIT)
             sdl.PushGPUVertexUniformData(cmd_buf, 0, &projs, size_of(projs))
+            sdl.PushGPUFragmentUniformData(cmd_buf, 1, &material, size_of(material))
             sdl.BindGPUFragmentSamplers(render_pass, 0, &sdl.GPUTextureSamplerBinding {
                 texture = model.texture.tex,
                 sampler = model.texture.sampler,
@@ -289,7 +287,7 @@ load_all_shaders :: proc(gpu: ^sdl.GPUDevice, shaders: ^[dynamic]^sdl.GPUShader)
         fmt.printfln("Failed to load frag shader from compiled file: %v", err_f)
         return
     }
-    append(shaders, load_shader(gpu, frag_code, .FRAGMENT, 1, 1))
+    append(shaders, load_shader(gpu, frag_code, .FRAGMENT, 2, 1))
 
 }
 
@@ -311,7 +309,7 @@ load_texture :: proc(gpu: ^sdl.GPUDevice, path: cstring, flip: i32) -> Texture {
 
     img_size: [2]i32
     stb.set_flip_vertically_on_load(flip)
-    pixels := stb.load(path, &img_size.x, &img_size.y, nil, 4); //assert(pixels != nil, "Failed to load texture")
+    pixels := stb.load(path, &img_size.x, &img_size.y, nil, 4); assert(pixels != nil, "Failed to load texture")
     if (pixels == nil) {
         fmt.println("Failed to load pixels from image")
     }

@@ -16,6 +16,7 @@ Mesh :: struct {
 Model :: struct {
     mesh:     Mesh,
     texture:  Texture,
+    material: MaterialUBO,
     buffers:  ModelBufferInfo,
     position: Vector3f,
     rotation: Vector3f,
@@ -126,8 +127,13 @@ load_obj_model :: proc(gpu: ^sdl.GPUDevice, obj_path: string, tex_path: string, 
     tex  := load_texture(gpu, strings.clone_to_cstring(tex_path), flip_tex)
 
     return Model {
-        mesh    = mesh,
-        texture = tex,
+        mesh     = mesh,
+        texture  = tex,
+        material = {
+            diffuse_color  = {1, 1, 1},
+            shininess      = 100,
+            specular_color = {1, 1, 1}
+        }
     }
 
 }
@@ -202,6 +208,12 @@ set_model_transform :: proc(model: ^Model, pos: Vector3f, rot: Vector3f, scale: 
     model.position = pos
     model.rotation = rot
     model.scale    = scale
+
+}
+
+set_model_material :: proc (model: ^Model, material: MaterialUBO) {
+
+    model.material = material
 
 }
 

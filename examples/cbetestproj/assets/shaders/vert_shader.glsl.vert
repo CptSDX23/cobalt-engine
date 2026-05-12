@@ -25,6 +25,5 @@ void main() {
     out_uv     = uv;
     out_pos    = vec3(m * pos);
     out_normal = normalize((n * vec4(normal, 0)).xyz);
-    //out_normal = normal;
     
 }

@@ -1,11 +1,11 @@
 win_name: CBE Test Proj
 win_size_x: 1040
 win_size_y: 650
-// win_size_x: 1600
-// win_size_y: 1000
-win_col_r: 0
-win_col_g: 0.2
-win_col_b: 0.6
+//win_size_x: 1600
+//win_size_y: 1000
+win_col_r: 0.1
+win_col_g: 0.1
+win_col_b: 0.1
 odin_main_path: src\
 shader_path_entry: shaders\frag_shader.glsl.frag
 shader_path_entry: shaders\vert_shader.glsl.vert

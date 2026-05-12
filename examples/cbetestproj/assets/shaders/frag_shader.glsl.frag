@@ -5,6 +5,12 @@ layout(set = 3, binding = 0) uniform lights {
     float lightIntensity;
     vec3  lightPosition;
     float lightAmbient;
+    vec3  camPosition;
+};
+layout(set = 3, binding = 1) uniform material {
+    vec3  diffuseColor;
+    float shininess;
+    vec3  specularColor;
 };
 
 layout(location = 0) in vec4 color;
@@ -16,23 +22,21 @@ layout(location = 0) out vec4 frag_color;
 
 layout(set = 2, binding = 0) uniform sampler2D tex_sampler;
 
+vec3 blinnPhong(vec3 dirToLight, vec3 dirToCamera, vec3 surfaceNormal) {
+
+    // Diffuse
+    vec3 diffuse = diffuseColor;
+
+    // Specular
+    vec3  halfwayDir        = normalize(dirToLight + dirToCamera);
+    float specularDir       = max(dot(halfwayDir, surfaceNormal), 0);
+    float specularIntensity = pow(specularDir, shininess);
+    vec3  specular          = specularColor * specularIntensity;
+
+    return diffuse + specular;
+}
+
 void main() {
-
-    // // Sample and gamma correct
-    // vec4 final = texture(tex_sampler, uv);
-    // final.rgb  = pow(final.rgb, vec3(2.2));
-    // 
-    // // Lighting
-    // 
-    // final      = final * color;
-    // final.rgb  = pow(final.rgb, vec3(1 / 2.2));
-    // frag_color = final;
-
-    // Temp Lighting
-    // vec3  lightColor     = vec3(1, 1, 1);
-    // float lightIntensity = 1;
-    // float lightAmbient   = 0.05;
-    // vec3  lightPosition  = vec3(0, 10, 65);
 
     // Relation to light
     vec3  vecToLight    = lightPosition - position;
@@ -48,8 +52,9 @@ void main() {
     vec3  irradiance    = incoming * incomingAngle * attenuation;
 
     // Reflection
-    float bdrf      = 1;
-    vec3  reflected = irradiance * bdrf;
+    vec3 dirToCamera = normalize(camPosition - position);
+    vec3 bdrf        = blinnPhong(dirToLight, dirToCamera, surfaceNormal);
+    vec3 reflected   = irradiance * bdrf;
 
     if (incomingAngle <= 0) {
         reflected = vec3(0, 0, 0);
