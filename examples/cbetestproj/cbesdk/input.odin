@@ -7,8 +7,9 @@ Keycode :: sdl.Scancode
 
 // Records input state from SDL
 InputState :: struct {
-    key_pressed: #sparse[sdl.Scancode]bool,
-    mouse_delta: Vector2f
+    key_pressed:   #sparse[sdl.Scancode]bool,
+    mouse_pressed: map[sdl.Uint8]bool,
+    mouse_delta:   Vector2f
 }
 
 set_key_down :: proc(input: ^InputState, key: sdl.Scancode) {
@@ -21,6 +22,14 @@ set_key_up :: proc(input: ^InputState, key: sdl.Scancode) {
 
 set_mouse_delta :: proc(input: ^InputState, delta: Vector2f) {
     input.mouse_delta = delta
+}
+
+set_mouse_down :: proc(input: ^InputState, button: sdl.Uint8) {
+    input.mouse_pressed[button - 1] = true
+}
+
+set_mouse_up :: proc(input: ^InputState, button: sdl.Uint8) {
+    input.mouse_pressed[button - 1] = false
 }
 
 // FPS counting

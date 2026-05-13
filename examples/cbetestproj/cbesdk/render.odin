@@ -4,8 +4,12 @@ import "core:fmt"
 import "core:os"
 import "core:mem"
 import "core:math/linalg"
-import sdl "vendor:sdl3"
-import stb "vendor:stb/image"
+
+import sdl    "vendor:sdl3"
+import stbi   "vendor:stb/image"
+import im     "shared:imgui"
+import im_sdl "shared:imgui/imgui_impl_sdl3"
+import im_gpu "shared:imgui/imgui_impl_sdlgpu3"
 
 // Structs
 RenderContext :: struct {
@@ -68,9 +72,6 @@ RenderCamera :: struct {
     forward:         Vector3f,
 }
 
-// Debug
-ROTATION := f32(0)
-
 // Defaults
 create_render_ctx :: proc(win_settings: WindowSettings) -> (RenderContext, FPSState) {
     
@@ -80,7 +81,7 @@ create_render_ctx :: proc(win_settings: WindowSettings) -> (RenderContext, FPSSt
 
     // This should have been up here a long time ago i wasted so much time
     ok = sdl.ClaimWindowForGPUDevice(gpu, window); assert(ok, "Failed to claim window for GPU device")
-    ok = sdl.SetWindowRelativeMouseMode(window, true); assert(ok, "Failed to lock mouse to window")
+    //ok = sdl.SetWindowRelativeMouseMode(window, true); assert(ok, "Failed to lock mouse to window")
 
     // Load all shaders to create pipeline
     shaders := make([dynamic]^sdl.GPUShader)
@@ -149,6 +150,16 @@ create_render_ctx :: proc(win_settings: WindowSettings) -> (RenderContext, FPSSt
         }
     })
 
+    // Init ImGUI
+    im.CHECKVERSION()
+    im.CreateContext()
+    im_sdl.InitForSDLGPU(window)
+    im_gpu.Init(&{
+        Device            = gpu,
+        ColorTargetFormat = sdl.GetGPUSwapchainTextureFormat(gpu, window),
+    })
+    set_ui_style()
+
     // Now ready to start drawing
     return RenderContext { 
         window    = window, 
@@ -172,30 +183,43 @@ run_render :: proc(ctx: RenderContext, input: ^InputState, fps_state: ^FPSState)
         // Events
         event: sdl.Event
         for sdl.PollEvent(&event) {
+
+            im_sdl.ProcessEvent(&event)
+
             #partial switch event.type {
                 case .QUIT:
                     return true
                 case .KEY_DOWN:
-                    //input.key_pressed[event.key.scancode] = true
                     set_key_down(input, event.key.scancode)
                 case .KEY_UP:
-                    //input.key_pressed[event.key.scancode] = false
                     set_key_up(input, event.key.scancode)
                 case .MOUSE_MOTION:
                     set_mouse_delta(input, {event.motion.xrel, event.motion.yrel})
+                case .MOUSE_BUTTON_DOWN:
+                    set_mouse_down(input, event.button.button)
+                case .MOUSE_BUTTON_UP:
+                    set_mouse_up(input, event.button.button)
             }
+
         }
 
         // FPS
         fps_state.last_ticks = fps_state.curr_ticks
         fps_state.curr_ticks = sdl.GetTicks()
 
-        // ROTATION += 1
+        // ImGUI
+        im_gpu.NewFrame()
+        im_sdl.NewFrame()
+        im.NewFrame()
+        draw_ui()
 
         // Render
         cmd_buf   := sdl.AcquireGPUCommandBuffer(ctx.gpu)
         swapchain :  ^sdl.GPUTexture
         ok := sdl.WaitAndAcquireGPUSwapchainTexture(cmd_buf, ctx.window, &swapchain, nil, nil); assert(ok, "Failed to aquire swapchain texture")
+
+        im.Render()
+        im_data := im.GetDrawData()
 
         // For when window is minimized
         if (swapchain == nil) {
@@ -262,6 +286,17 @@ run_render :: proc(ctx: RenderContext, input: ^InputState, fps_state: ^FPSState)
 
         sdl.EndGPURenderPass(render_pass)
 
+        // ImGUI pas
+        im_color_target := sdl.GPUColorTargetInfo {
+            texture  = swapchain,
+            load_op  = .LOAD,
+            store_op = .STORE,
+        }
+        im_gpu.PrepareDrawData(im_data, cmd_buf)
+        im_render_pass := sdl.BeginGPURenderPass(cmd_buf, &im_color_target, 1, nil)
+        im_gpu.RenderDrawData(im_data, cmd_buf, render_pass)
+        sdl.EndGPURenderPass(im_render_pass)
+
         // Display
         ok = sdl.SubmitGPUCommandBuffer(cmd_buf); assert(ok, "Failed to submit command buffer")
 
@@ -308,8 +343,8 @@ load_shader :: proc(gpu: ^sdl.GPUDevice, code: []u8, stage: sdl.GPUShaderStage, 
 load_texture :: proc(gpu: ^sdl.GPUDevice, path: cstring, flip: i32) -> Texture {
 
     img_size: [2]i32
-    stb.set_flip_vertically_on_load(flip)
-    pixels := stb.load(path, &img_size.x, &img_size.y, nil, 4); assert(pixels != nil, "Failed to load texture")
+    stbi.set_flip_vertically_on_load(flip)
+    pixels := stbi.load(path, &img_size.x, &img_size.y, nil, 4); assert(pixels != nil, "Failed to load texture")
     if (pixels == nil) {
         fmt.println("Failed to load pixels from image")
     }
@@ -370,4 +405,61 @@ add_model :: proc(ctx: ^RenderContext, model: Model) {
 
 set_model :: proc(ctx: ^RenderContext, model: Model, index: i32) {
     ctx.models[index] = model
+}
+
+// UI
+set_ui_style :: proc() {
+
+    style := im.GetStyle()
+    io    := im.GetIO()
+
+    // Palette
+    bg        := [4]f32{0.1, 0.1, 0.1, 1}
+    fg        := [4]f32{0.15, 0.15, 0.15, 1}
+    highlight := [4]f32{0.2, 0.2, 0.2, 1} 
+
+    // IO config
+    io.ConfigDockingAlwaysTabBar         = true
+    io.ConfigWindowsMoveFromTitleBarOnly = true
+    
+    io.ConfigFlags = {.DockingEnable}
+
+    // Window
+    style.Colors[im.Col.WindowBg]      = fg
+    style.Colors[im.Col.TitleBg]       = bg
+    style.Colors[im.Col.TitleBgActive] = bg
+
+    style.WindowBorderSize = 0
+
+    // Tabs
+    style.Colors[im.Col.Tab]                       = bg
+    style.Colors[im.Col.TabHovered]                = highlight
+    style.Colors[im.Col.TabSelected]               = fg
+    style.Colors[im.Col.TabSelectedOverline]       = fg
+    style.Colors[im.Col.TabDimmed]                 = fg
+    style.Colors[im.Col.TabDimmedSelected]         = fg
+    style.Colors[im.Col.TabDimmedSelectedOverline] = fg
+    style.Colors[im.Col.Border]                    = {0, 0, 0, 0}
+
+    style.TabRounding      = 0
+    style.TabBorderSize    = 25
+    style.TabBarBorderSize = 0
+
+}
+
+draw_ui :: proc() {
+
+    flags := im.WindowFlags.NoCollapse
+
+    if im.Begin("Inspector", nil, {.NoCollapse}) {
+        im.Text("Hello CBE")
+    }
+    im.End()
+    if im.Begin("Scene Explorer", nil, {.NoCollapse}) {
+        im.Text("Hello CBE")
+    }
+    im.End()
+
+    im.ShowDemoWindow()
+
 }

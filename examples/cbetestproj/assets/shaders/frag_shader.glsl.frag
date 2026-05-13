@@ -48,7 +48,6 @@ void main() {
     vec3  incoming      = lightColor * lightIntensity;
     float incomingAngle = dot(dirToLight, surfaceNormal);
     float attenuation   = 1 / ((distToLight) * 0.05);
-    //float attenuation   = 1;
     vec3  irradiance    = incoming * incomingAngle * attenuation;
 
     // Reflection

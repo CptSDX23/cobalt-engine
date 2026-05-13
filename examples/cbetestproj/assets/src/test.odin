@@ -55,10 +55,9 @@ test_system := cbesdk.System {
     },
     update = proc(scene: ^cbesdk.Scene, deltaTime: f32) {
 
-        // matches, indices := cbesdk.query_scene_components(scene, TestComponent)
-        // fmt.printfln("First match's value before adding: %v", matches[0].value)
-        // matches[0].value += 10
-        // cbesdk.write_back_components(scene, TestComponent, matches, indices)
+        if (!scene.input_state.mouse_pressed[0]) {
+            return
+        }
 
         // The idea is to query all cameras and their entity uuids, find which one is main, get a transform
         // on the same entity, modify its value, and write only the transform back
