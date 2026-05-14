@@ -21,7 +21,6 @@ RenderContext :: struct {
     models:     [dynamic]Model,
     camera:     RenderCamera,
     settings:   WindowSettings,
-    ui_enables: [dynamic]bool,
 }
 
 WindowSettings :: struct {
@@ -77,7 +76,7 @@ RenderCamera :: struct {
 create_render_ctx :: proc(win_settings: WindowSettings) -> (RenderContext, FPSState) {
     
     ok     := sdl.Init({.VIDEO}); assert(ok, "Failed to initialize SDL3")
-    window := sdl.CreateWindow(win_settings.name, win_settings.size.x, win_settings.size.y, {.RESIZABLE, .MAXIMIZED, .BORDERLESS}); assert(window != nil, "Failed to create window")
+    window := sdl.CreateWindow(win_settings.name, win_settings.size.x, win_settings.size.y, {.RESIZABLE, .BORDERLESS}); assert(window != nil, "Failed to create window")
     gpu    := sdl.CreateGPUDevice({.SPIRV}, true, nil); assert(gpu != nil, "Failed to create GPU device")
 
     // This should have been up here a long time ago i wasted so much time
@@ -159,9 +158,7 @@ create_render_ctx :: proc(win_settings: WindowSettings) -> (RenderContext, FPSSt
         Device            = gpu,
         ColorTargetFormat = sdl.GetGPUSwapchainTextureFormat(gpu, window),
     })
-    set_ui_style()
-    enabled := make([dynamic]bool)
-    append(&enabled, true, true, true, true)
+    //set_ui_style()
 
     // Now ready to start drawing
     return RenderContext { 
@@ -173,7 +170,6 @@ create_render_ctx :: proc(win_settings: WindowSettings) -> (RenderContext, FPSSt
         models     = models,
         camera     = cam,
         settings   = win_settings,
-        ui_enables = enabled,
     }, FPSState { last_ticks = sdl.GetTicks(), curr_ticks = sdl.GetTicks() }
 
 }
@@ -219,8 +215,7 @@ run_render :: proc(ctx: RenderContext, input: ^InputState, fps_state: ^FPSState)
         im_gpu.NewFrame()
         im_sdl.NewFrame()
         im.NewFrame()
-        im.DockSpaceOverViewport(0, im.GetMainViewport(), {.PassthruCentralNode, .NoDockingOverCentralNode})
-        draw_ui(ctx.ui_enables)
+        draw_ui()
 
         // Render
         cmd_buf   := sdl.AcquireGPUCommandBuffer(ctx.gpu)
@@ -414,84 +409,4 @@ add_model :: proc(ctx: ^RenderContext, model: Model) {
 
 set_model :: proc(ctx: ^RenderContext, model: Model, index: i32) {
     ctx.models[index] = model
-}
-
-// UI
-set_ui_style :: proc() {
-
-    style := im.GetStyle()
-    io    := im.GetIO()
-
-    // Palette
-    bg        := [4]f32{0.1, 0.1, 0.1, 1}
-    fg        := [4]f32{0.15, 0.15, 0.15, 1}
-    highlight := [4]f32{0.2, 0.2, 0.2, 1} 
-    none      := [4]f32{0, 0, 0, 0}
-
-    // IO config
-    io.ConfigDockingAlwaysTabBar         = true
-    io.ConfigWindowsMoveFromTitleBarOnly = true
-    io.ConfigFlags                       = {.DockingEnable,}
-    
-    // Window
-    style.Colors[im.Col.Border]            = bg
-    style.Colors[im.Col.WindowBg]          = fg
-    style.Colors[im.Col.TitleBg]           = bg
-    style.Colors[im.Col.TitleBgActive]     = bg
-    style.Colors[im.Col.ResizeGrip]        = none
-    style.Colors[im.Col.ResizeGripHovered] = none
-    style.Colors[im.Col.ResizeGripActive]  = none
-
-    style.WindowBorderSize     = 2
-    style.WindowPadding        = 8
-    style.ChildBorderSize      = 4
-    style.DockingSeparatorSize = 0
-    style.ScrollbarSize        = 10
-    style.ScrollbarRounding    = 0
-
-    // Tabs
-    style.Colors[im.Col.Tab]                       = bg
-    style.Colors[im.Col.TabHovered]                = highlight
-    style.Colors[im.Col.TabSelected]               = fg
-    style.Colors[im.Col.TabSelectedOverline]       = fg
-    style.Colors[im.Col.TabDimmed]                 = bg
-    style.Colors[im.Col.TabDimmedSelected]         = fg
-    style.Colors[im.Col.TabDimmedSelectedOverline] = fg
-
-    style.TabRounding                      = 0
-    style.TabBorderSize                    = 0
-    style.TabBarBorderSize                 = 0
-    style.TabBarOverlineSize               = 3
-    style.WindowMenuButtonPosition         = .None
-    style.TabCloseButtonMinWidthUnselected = 0
-
-}
-
-draw_ui :: proc(enabled: [dynamic]bool) {
-
-    window_class: im.WindowClass
-    window_class.DockNodeFlagsOverrideSet = {.AutoHideTabBar, .NoUndocking, .NoResize, transmute(im.DockNodeFlag)u32(2048) }
-
-    im.SetNextWindowClass(&window_class)
-    if im.Begin("Title", &enabled[0], {.NoCollapse, .NoResize, .NoTitleBar,}) {
-    }
-    im.End()
-
-    if im.Begin("Inspector", &enabled[1], {.NoCollapse, .NoResize}) {
-        im.Text("Hello CBE")
-    }
-    im.End()
-
-    if im.Begin("Scene Explorer", &enabled[2], {.NoCollapse, .NoResize}) {
-        im.Text("Hello CBE")
-    }
-    im.End()
-
-    if im.Begin("Asset Explorer", &enabled[3], {.NoCollapse, .NoResize}) {
-        im.Text("Hello CBE")
-    }
-    im.End()
-
-    //im.ShowDemoWindow()
-
 }
