@@ -55,7 +55,7 @@ test_system := cbesdk.System {
     },
     update = proc(scene: ^cbesdk.Scene, deltaTime: f32) {
 
-        if (!scene.input_state.mouse_pressed[0]) {
+        if (!scene.input_state.mouse_pressed[2]) {
             return
         }
 
@@ -71,7 +71,7 @@ test_system := cbesdk.System {
 
                 // Move from input
                 move_speed := 25 * deltaTime
-                look_sens  := f32(0.66)
+                look_sens  := f32(0.5)
                 move_vec   := cbesdk.Vector3f{0, 0, 0}
                 if (scene.input_state.key_pressed[.W]) {
                     move_vec += {0, 0, move_speed}
