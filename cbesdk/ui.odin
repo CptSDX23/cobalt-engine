@@ -20,6 +20,9 @@ DockContent :: struct {
 }
 
 DockButton :: struct {
+    size:   Vector2f,
+    pos:    Vector2f,
+    text:   string,
     render: proc(draw_list: ^im.DrawList, start: Vector2f, end: Vector2f, text: string, colors: map[ThemeColor]ColorRGBA),
 }
 
@@ -41,6 +44,7 @@ ChildType :: enum {
 }
 ThemeColor :: enum {
     Accent,
+    AccentHover,
     Foreground,
     Background,
     Text,
@@ -51,6 +55,7 @@ ThemeColor :: enum {
 // Default
 DARK_THEME := map[ThemeColor]ColorRGBA {
     .Accent       = {0, 0.2, 0.5, 1},
+    .AccentHover  = {0.1, 0.3, 0.6, 1},
     .Foreground   = {0.085, 0.085, 0.085, 1},
     .Background   = {0.075, 0.075, 0.075, 1},
     .Text         = {1, 1, 1, 1},
@@ -59,6 +64,7 @@ DARK_THEME := map[ThemeColor]ColorRGBA {
 // Evil
 LIGHT_THEME := map[ThemeColor]ColorRGBA {
     .Accent       = {0, 0.2, 0.5, 1},
+    .AccentHover  = {0.1, 0.3, 0.6, 1},
     .Foreground   = {0.875, 0.875, 0.875, 1},
     .Background   = {0.9, 0.9, 0.9, 1},
     .Text         = {0, 0, 0, 0},
@@ -82,20 +88,33 @@ LIGHT_THEME := map[ThemeColor]ColorRGBA {
 // Dock content types
 TITLE_BAR_CONTENT :: DockContent {
     render = proc(draw_list: ^im.DrawList, start: Vector2f, end: Vector2f, colors: map[ThemeColor]ColorRGBA) {
+        
+        im.DrawList_AddRectFilled(draw_list, start, end, im.ColorConvertFloat4ToU32(colors[.Accent]))
 
-        if detect_mouse(start, end) {
-            im.DrawList_AddRectFilled(draw_list, start, end, im.ColorConvertFloat4ToU32(colors[.Foreground]))
-        } else {
-            im.DrawList_AddRectFilled(draw_list, start, end, im.ColorConvertFloat4ToU32(colors[.Accent]))
-        }
+        total_w      := f32(0)
+        file_btn     := create_text_button(32, {40 + total_w, 0}, "File");      total_w += file_btn.size.x
+        edit_btn     := create_text_button(32, {40 + total_w, 0}, "Edit");      total_w += edit_btn.size.x
+        scene_btn    := create_text_button(32, {40 + total_w, 0}, "Scene");     total_w += scene_btn.size.x
+        assets_btn   := create_text_button(32, {40 + total_w, 0}, "Assets");    total_w += assets_btn.size.x
+        window_btn   := create_text_button(32, {40 + total_w, 0}, "Window");    total_w += window_btn.size.x
+        build_btn    := create_text_button(32, {40 + total_w, 0}, "Build");     total_w += build_btn.size.x
+        settings_btn := create_text_button(32, {40 + total_w, 0}, "Settings");  total_w += settings_btn.size.x
 
-        im.DrawList_AddText(draw_list, start + {50, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), "File")
-        im.DrawList_AddText(draw_list, start + {100, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), "Edit")
-        im.DrawList_AddText(draw_list, start + {150, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), "Scene")
-        im.DrawList_AddText(draw_list, start + {210, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), "Assets")
-        im.DrawList_AddText(draw_list, start + {275, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), "Window")
-        im.DrawList_AddText(draw_list, start + {340, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), "Build")
-        im.DrawList_AddText(draw_list, start + {400, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), "Settings")
+        render_button(draw_list, file_btn, colors)
+        render_button(draw_list, edit_btn, colors)
+        render_button(draw_list, scene_btn, colors)
+        render_button(draw_list, assets_btn, colors)
+        render_button(draw_list, window_btn, colors)
+        render_button(draw_list, build_btn, colors)
+        render_button(draw_list, settings_btn, colors)
+
+        // im.DrawList_AddText(draw_list, start + {50, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), "File")
+        // im.DrawList_AddText(draw_list, start + {100, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), "Edit")
+        // im.DrawList_AddText(draw_list, start + {150, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), "Scene")
+        // im.DrawList_AddText(draw_list, start + {210, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), "Assets")
+        // im.DrawList_AddText(draw_list, start + {275, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), "Window")
+        // im.DrawList_AddText(draw_list, start + {340, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), "Build")
+        // im.DrawList_AddText(draw_list, start + {400, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), "Settings")
 
     }
 }
@@ -133,7 +152,7 @@ draw_ui :: proc() {
     draw_list  := im.GetBackgroundDrawList()
 
     // Default docking
-    size := f32(0.75)
+    size := f32(1)
     fs_dock := create_dock()
     split_blank_dock(fs_dock, TITLE_BAR_CONTENT, .First, .XTop, 32)
     split_blank_dock(fs_dock.second_child, STATUS_BAR_CONTENT, .Second, .XBottom, 20)
@@ -228,15 +247,31 @@ detect_mouse :: proc(start: Vector2f, end: Vector2f) -> bool {
 }
 
 // Makes a button with text
-create_text_button :: proc(text: string) -> DockButton {
-
-
+create_text_button :: proc(height: f32, pos: Vector2f, text: string) -> DockButton {
 
     return DockButton {
+        size   = {im.CalcTextSize(strings.clone_to_cstring(text)).x + 20, height},
+        pos    = pos,
+        text   = text,
         render = proc(draw_list: ^im.DrawList, start: Vector2f, end: Vector2f, text: string, colors: map[ThemeColor]ColorRGBA) {
-            im.DrawList_AddRectFilled(draw_list, start, {start.x + im.CalcTextSize(strings.clone_to_cstring(text)).x + 20, end.y}, im.ColorConvertFloat4ToU32(colors[.Accent]))
+
+            end_pos := Vector2f {start.x + im.CalcTextSize(strings.clone_to_cstring(text)).x + 20, end.y}
+
+            if detect_mouse(start, end_pos) {
+                im.DrawList_AddRectFilled(draw_list, start, end_pos, im.ColorConvertFloat4ToU32(colors[.AccentHover]))
+            } else {
+                im.DrawList_AddRectFilled(draw_list, start, end_pos, im.ColorConvertFloat4ToU32(colors[.Accent]))
+            }
+
             im.DrawList_AddText(draw_list, start + {10, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), strings.clone_to_cstring(text))
+
         },
     }
+
+}
+
+render_button :: proc(draw_list: ^im.DrawList, button: DockButton, colors: map[ThemeColor]ColorRGBA) {
+
+    button.render(draw_list, button.pos, button.pos + button.size, button.text, colors)
 
 }
