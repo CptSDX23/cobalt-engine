@@ -19,6 +19,10 @@ DockContent :: struct {
     render: proc(draw_list: ^im.DrawList, start: Vector2f, end: Vector2f, colors: map[ThemeColor]ColorRGBA),
 }
 
+DockButton :: struct {
+    render: proc(draw_list: ^im.DrawList, start: Vector2f, end: Vector2f, text: string, colors: map[ThemeColor]ColorRGBA),
+}
+
 // Types
 DockType :: enum {
     Blank,
@@ -79,14 +83,20 @@ LIGHT_THEME := map[ThemeColor]ColorRGBA {
 TITLE_BAR_CONTENT :: DockContent {
     render = proc(draw_list: ^im.DrawList, start: Vector2f, end: Vector2f, colors: map[ThemeColor]ColorRGBA) {
 
-        im.DrawList_AddRectFilled(draw_list, start, end, im.ColorConvertFloat4ToU32(colors[.Accent]))
+        if detect_mouse(start, end) {
+            im.DrawList_AddRectFilled(draw_list, start, end, im.ColorConvertFloat4ToU32(colors[.Foreground]))
+        } else {
+            im.DrawList_AddRectFilled(draw_list, start, end, im.ColorConvertFloat4ToU32(colors[.Accent]))
+        }
 
         im.DrawList_AddText(draw_list, start + {50, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), "File")
         im.DrawList_AddText(draw_list, start + {100, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), "Edit")
         im.DrawList_AddText(draw_list, start + {150, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), "Scene")
         im.DrawList_AddText(draw_list, start + {210, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), "Assets")
         im.DrawList_AddText(draw_list, start + {275, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), "Window")
-        im.DrawList_AddText(draw_list, start + {340, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), "Settings")
+        im.DrawList_AddText(draw_list, start + {340, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), "Build")
+        im.DrawList_AddText(draw_list, start + {400, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), "Settings")
+
     }
 }
 
@@ -123,15 +133,13 @@ draw_ui :: proc() {
     draw_list  := im.GetBackgroundDrawList()
 
     // Default docking
-    size := f32(1)
+    size := f32(0.75)
     fs_dock := create_dock()
     split_blank_dock(fs_dock, TITLE_BAR_CONTENT, .First, .XTop, 32)
     split_blank_dock(fs_dock.second_child, STATUS_BAR_CONTENT, .Second, .XBottom, 20)
     split_blank_dock(fs_dock.second_child.first_child, TAB_CONTENT, .Second, .YBottom, 400 * size)
-    split_blank_dock(fs_dock.second_child.first_child.first_child, TAB_CONTENT, .Second, .XBottom, 350 * size)
+    split_blank_dock(fs_dock.second_child.first_child.first_child, TAB_CONTENT, .Second, .XBottom, 300 * size)
     split_blank_dock(fs_dock.second_child.first_child.first_child.first_child, TAB_CONTENT, .First, .YTop, 300 * size)
-
-    //fmt.println(fs_dock)
 
     draw_dock(fs_dock, draw_list, {0, 0}, screen_dim)
 
@@ -156,8 +164,6 @@ create_dock_with_content :: proc(content: DockContent) -> ^DockSpace {
 // Recurse throught a dock to draw it
 draw_dock :: proc(dock: ^DockSpace, draw_list: ^im.DrawList, start: Vector2f, end: Vector2f) {
 
-    //fmt.println("New dock draw")
-
     if dock.dock_type == .Blank {
         // Nothing to do
     }
@@ -165,13 +171,9 @@ draw_dock :: proc(dock: ^DockSpace, draw_list: ^im.DrawList, start: Vector2f, en
 
         // Draw the content
         dock.content.render(draw_list, start, end, DARK_THEME)
-        //fmt.println("Draw Content")
 
     }
     if dock.dock_type == .Split {
-
-        //fmt.println(dock.first_child^)
-        //fmt.println(dock.second_child^)
 
         // Draw the two children
         if dock.split_type == .XTop {
@@ -210,7 +212,31 @@ split_blank_dock :: proc(parent: ^DockSpace, content: DockContent, child: ChildT
         parent.second_child = create_dock_with_content(content)
     }
 
-    //fmt.println(parent.first_child^)
-    //fmt.println(parent.second_child^)
+}
+
+// Mouse detection
+detect_mouse :: proc(start: Vector2f, end: Vector2f) -> bool {
+    
+    pos := im.GetMousePos()
+
+    if (pos.x >= start.x && pos.x <= end.x && pos.y >= start.y && pos.y <= end.y) {
+        return true
+    } else {
+        return false
+    }
+
+}
+
+// Makes a button with text
+create_text_button :: proc(text: string) -> DockButton {
+
+
+
+    return DockButton {
+        render = proc(draw_list: ^im.DrawList, start: Vector2f, end: Vector2f, text: string, colors: map[ThemeColor]ColorRGBA) {
+            im.DrawList_AddRectFilled(draw_list, start, {start.x + im.CalcTextSize(strings.clone_to_cstring(text)).x + 20, end.y}, im.ColorConvertFloat4ToU32(colors[.Accent]))
+            im.DrawList_AddText(draw_list, start + {10, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), strings.clone_to_cstring(text))
+        },
+    }
 
 }
