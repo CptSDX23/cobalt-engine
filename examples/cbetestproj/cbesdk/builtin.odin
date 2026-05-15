@@ -5,10 +5,11 @@ import "core:math/linalg"
 import "core:strconv"
 
 // Maths
-Vector2f :: [2]f32
-Vector2i :: [2]i32
-Vector3f :: [3]f32
-Vector3i :: [3]i32
+Vector2f  :: [2]f32
+Vector2i  :: [2]i32
+Vector3f  :: [3]f32
+Vector3i  :: [3]i32
+ColorRGBA :: [4]f32
 
 forward_from_rotation :: proc(rot: Vector3f) -> Vector3f {
     return linalg.matrix3_from_yaw_pitch_roll_f32(linalg.to_radians(rot.y), linalg.to_radians(rot.x), linalg.to_radians(rot.z)) * Vector3f {0, 0, -1}

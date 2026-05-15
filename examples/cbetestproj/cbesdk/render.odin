@@ -76,7 +76,7 @@ RenderCamera :: struct {
 create_render_ctx :: proc(win_settings: WindowSettings) -> (RenderContext, FPSState) {
     
     ok     := sdl.Init({.VIDEO}); assert(ok, "Failed to initialize SDL3")
-    window := sdl.CreateWindow(win_settings.name, win_settings.size.x, win_settings.size.y, {.RESIZABLE, .BORDERLESS}); assert(window != nil, "Failed to create window")
+    window := sdl.CreateWindow(win_settings.name, win_settings.size.x, win_settings.size.y, {.RESIZABLE, .MAXIMIZED}); assert(window != nil, "Failed to create window")
     gpu    := sdl.CreateGPUDevice({.SPIRV}, true, nil); assert(gpu != nil, "Failed to create GPU device")
 
     // This should have been up here a long time ago i wasted so much time
@@ -212,6 +212,8 @@ run_render :: proc(ctx: RenderContext, input: ^InputState, fps_state: ^FPSState)
         fps_state.curr_ticks = sdl.GetTicks()
 
         // ImGUI
+        //io := im.GetIO()
+        //im.FontAtlas_AddFontDefault(io.Fonts, &im.FontConfig { SizePixels = 16, RasterizerDensity = 1 })
         im_gpu.NewFrame()
         im_sdl.NewFrame()
         im.NewFrame()
