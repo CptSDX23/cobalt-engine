@@ -11,6 +11,7 @@ Application :: struct {
     registry:   TypeRegistry,
     render_ctx: RenderContext,
     fps_state:  FPSState,
+    settings:   ProjectSettings,
 }
 
 // Just the state of an ECS
@@ -319,6 +320,7 @@ create_application :: proc(registry: ^TypeRegistry, abs_proj_path: string) -> Ap
         registry   = registry^,
         render_ctx = render_ctx,
         fps_state  = fps_state,
+        settings   = settings,
     }
 
 }
@@ -332,7 +334,7 @@ run_application :: proc(app: ^Application) {
 
         update_app(&app.scene, app, get_fps(app.fps_state))
         update_scene(&app.scene, get_fps(app.fps_state))
-        quit := run_render(app.render_ctx, &app.scene.input_state, &app.fps_state)
+        quit := run_render(app.render_ctx, &app.scene.input_state, &app.fps_state, app)
 
         // Exit app
         if quit {

@@ -2,6 +2,7 @@
 
 package cbesdk
 
+import "core:debug/trace"
 import "core:fmt"
 import "core:strings"
 import im "shared:imgui"
@@ -16,7 +17,7 @@ DockSpace :: struct {
 }
 
 DockContent :: struct {
-    render: proc(draw_list: ^im.DrawList, start: Vector2f, end: Vector2f, colors: map[ThemeColor]ColorRGBA),
+    render: proc(draw_list: ^im.DrawList, app: ^Application, start: Vector2f, end: Vector2f, colors: map[ThemeColor]ColorRGBA),
 }
 
 DockButton :: struct {
@@ -25,6 +26,13 @@ DockButton :: struct {
     text:   string,
     render: proc(draw_list: ^im.DrawList, start: Vector2f, end: Vector2f, text: string, colors: map[ThemeColor]ColorRGBA),
 }
+
+// Variables so docks can communicate
+DockVariable :: struct {
+    name:  string,
+    value: string,
+}
+dock_vars: [dynamic]^DockVariable
 
 // Types
 DockType :: enum {
@@ -46,6 +54,7 @@ ThemeColor :: enum {
     Accent,
     AccentHover,
     Foreground,
+    Highlight,
     Background,
     Text,
     TextDisabled,
@@ -57,6 +66,7 @@ DARK_THEME := map[ThemeColor]ColorRGBA {
     .Accent       = {0, 0.2, 0.5, 1},
     .AccentHover  = {0.1, 0.3, 0.6, 1},
     .Foreground   = {0.085, 0.085, 0.085, 1},
+    .Highlight    = {0.115, 0.115, 0.115, 1},
     .Background   = {0.075, 0.075, 0.075, 1},
     .Text         = {1, 1, 1, 1},
     .TextDisabled = {0.3, 0.3, 0.3, 0.3},
@@ -66,9 +76,10 @@ LIGHT_THEME := map[ThemeColor]ColorRGBA {
     .Accent       = {0, 0.2, 0.5, 1},
     .AccentHover  = {0.1, 0.3, 0.6, 1},
     .Foreground   = {0.875, 0.875, 0.875, 1},
+    .Highlight    = {0.8, 0.8, 0.8, 1},
     .Background   = {0.9, 0.9, 0.9, 1},
-    .Text         = {0, 0, 0, 0},
-    .TextDisabled = {0.5, 0.5, 0.5, 0.5},
+    .Text         = {0, 0, 0, 1},
+    .TextDisabled = {0.5, 0.5, 0.5, 1},
 }
 // // Odd
 // SILVER_THEME := map[ThemeColor]ColorRGBA {
@@ -87,19 +98,20 @@ LIGHT_THEME := map[ThemeColor]ColorRGBA {
 
 // Dock content types
 TITLE_BAR_CONTENT :: DockContent {
-    render = proc(draw_list: ^im.DrawList, start: Vector2f, end: Vector2f, colors: map[ThemeColor]ColorRGBA) {
+    render = proc(draw_list: ^im.DrawList, app: ^Application, start: Vector2f, end: Vector2f, colors: map[ThemeColor]ColorRGBA) {
         
         im.DrawList_AddRectFilled(draw_list, start, end, im.ColorConvertFloat4ToU32(colors[.Accent]))
 
         total_w      := f32(0)
-        file_btn     := create_text_button(32, {40 + total_w, 0}, "File");      total_w += file_btn.size.x
-        edit_btn     := create_text_button(32, {40 + total_w, 0}, "Edit");      total_w += edit_btn.size.x
-        scene_btn    := create_text_button(32, {40 + total_w, 0}, "Scene");     total_w += scene_btn.size.x
-        assets_btn   := create_text_button(32, {40 + total_w, 0}, "Assets");    total_w += assets_btn.size.x
-        window_btn   := create_text_button(32, {40 + total_w, 0}, "Window");    total_w += window_btn.size.x
-        build_btn    := create_text_button(32, {40 + total_w, 0}, "Build");     total_w += build_btn.size.x
-        settings_btn := create_text_button(32, {40 + total_w, 0}, "Settings");  total_w += settings_btn.size.x
+        file_btn     := create_header_text_button(32, {40 + total_w, 0}, "File");      total_w += file_btn.size.x
+        edit_btn     := create_header_text_button(32, {40 + total_w, 0}, "Edit");      total_w += edit_btn.size.x
+        scene_btn    := create_header_text_button(32, {40 + total_w, 0}, "Scene");     total_w += scene_btn.size.x
+        assets_btn   := create_header_text_button(32, {40 + total_w, 0}, "Assets");    total_w += assets_btn.size.x
+        window_btn   := create_header_text_button(32, {40 + total_w, 0}, "Window");    total_w += window_btn.size.x
+        build_btn    := create_header_text_button(32, {40 + total_w, 0}, "Build");     total_w += build_btn.size.x
+        settings_btn := create_header_text_button(32, {40 + total_w, 0}, "Settings");  total_w += settings_btn.size.x
 
+        // Draw
         render_button(draw_list, file_btn, colors)
         render_button(draw_list, edit_btn, colors)
         render_button(draw_list, scene_btn, colors)
@@ -108,44 +120,78 @@ TITLE_BAR_CONTENT :: DockContent {
         render_button(draw_list, build_btn, colors)
         render_button(draw_list, settings_btn, colors)
 
-        // im.DrawList_AddText(draw_list, start + {50, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), "File")
-        // im.DrawList_AddText(draw_list, start + {100, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), "Edit")
-        // im.DrawList_AddText(draw_list, start + {150, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), "Scene")
-        // im.DrawList_AddText(draw_list, start + {210, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), "Assets")
-        // im.DrawList_AddText(draw_list, start + {275, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), "Window")
-        // im.DrawList_AddText(draw_list, start + {340, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), "Build")
-        // im.DrawList_AddText(draw_list, start + {400, 9}, im.ColorConvertFloat4ToU32(colors[.Text]), "Settings")
+        // Menus
+        if is_button_clicked(file_btn) {
+            fmt.println("File Clicked")
+        }
 
     }
 }
 
 STATUS_BAR_CONTENT :: DockContent {
-    render = proc(draw_list: ^im.DrawList, start: Vector2f, end: Vector2f, colors: map[ThemeColor]ColorRGBA) {
+    render = proc(draw_list: ^im.DrawList, app: ^Application, start: Vector2f, end: Vector2f, colors: map[ThemeColor]ColorRGBA) {
 
-        version_text := strings.clone_to_cstring(strings.concatenate({"Cobalt Engine ", current_version()}))
+        version_text   := strings.clone_to_cstring(strings.concatenate({"Cobalt Engine ", current_version()}))
+        proj_path_text := strings.split(app.settings.abs_proj_path, "\\")[len(strings.split(app.settings.abs_proj_path, "\\")) - 1]
 
         im.DrawList_AddRectFilled(draw_list, start, end, im.ColorConvertFloat4ToU32(colors[.Foreground]))
         im.DrawList_AddText(draw_list, start + {8, 2}, im.ColorConvertFloat4ToU32(colors[.TextDisabled]), version_text)
-        im.DrawList_AddText(draw_list, start + {200, 2}, im.ColorConvertFloat4ToU32(colors[.TextDisabled]), "cbetestproj")
+        im.DrawList_AddText(draw_list, start + {200, 2}, im.ColorConvertFloat4ToU32(colors[.TextDisabled]), strings.clone_to_cstring(proj_path_text))
         im.DrawList_AddText(draw_list, {end.x - 125, start.y + 2}, im.ColorConvertFloat4ToU32(colors[.TextDisabled]), "No Tasks Running")
 
     }
 }
 
-TAB_CONTENT :: DockContent {
-    render = proc(draw_list: ^im.DrawList, start: Vector2f, end: Vector2f, colors: map[ThemeColor]ColorRGBA) {
+INSPECTOR_TAB_CONTENT :: DockContent {
+    render = proc(draw_list: ^im.DrawList, app: ^Application, start: Vector2f, end: Vector2f, colors: map[ThemeColor]ColorRGBA) {
+
+        text_size := im.CalcTextSize(strings.clone_to_cstring("Inspector")).x + 14
 
         im.DrawList_AddRectFilled(draw_list, start, end, im.ColorConvertFloat4ToU32(colors[.Background]))
-        im.DrawList_AddRectFilled(draw_list, start + {4, 4}, end - {4, 4}, im.ColorConvertFloat4ToU32(colors[.Foreground]))
-        im.DrawList_AddRectFilled(draw_list, start + {100, 4}, {end.x - 4, start.y + 24}, im.ColorConvertFloat4ToU32(colors[.Background]))
+        im.DrawList_AddRectFilled(draw_list, start + {4, 28}, end - {4, 4}, im.ColorConvertFloat4ToU32(colors[.Foreground]))
+        im.DrawList_AddRectFilled(draw_list, start + {4, 4}, start + {text_size, 28}, im.ColorConvertFloat4ToU32(colors[.Foreground]))
 
-        im.DrawList_AddText(draw_list, start + {8, 6}, im.ColorConvertFloat4ToU32(colors[.Text]), "Inspector")
+        im.DrawList_AddText(draw_list, start + {8, 8}, im.ColorConvertFloat4ToU32(colors[.Text]), "Inspector")
+
+    }
+}
+
+ASSETS_TAB_CONTENT :: DockContent {
+    render = proc(draw_list: ^im.DrawList, app: ^Application, start: Vector2f, end: Vector2f, colors: map[ThemeColor]ColorRGBA) {
+
+        text_size := im.CalcTextSize(strings.clone_to_cstring("Assets")).x + 14
+
+        im.DrawList_AddRectFilled(draw_list, start, end, im.ColorConvertFloat4ToU32(colors[.Background]))
+        im.DrawList_AddRectFilled(draw_list, start + {4, 28}, end - {4, 4}, im.ColorConvertFloat4ToU32(colors[.Foreground]))
+        im.DrawList_AddRectFilled(draw_list, start + {4, 4}, start + {text_size, 28}, im.ColorConvertFloat4ToU32(colors[.Foreground]))
+
+        im.DrawList_AddText(draw_list, start + {8, 8}, im.ColorConvertFloat4ToU32(colors[.Text]), "Assets")
+
+    }
+}
+
+SCENE_TAB_CONTENT :: DockContent {
+    render = proc(draw_list: ^im.DrawList, app: ^Application, start: Vector2f, end: Vector2f, colors: map[ThemeColor]ColorRGBA) {
+
+        text_size := im.CalcTextSize(strings.clone_to_cstring("Scene")).x + 14
+
+        im.DrawList_AddRectFilled(draw_list, start, end, im.ColorConvertFloat4ToU32(colors[.Background]))
+        im.DrawList_AddRectFilled(draw_list, start + {4, 28}, end - {4, 4}, im.ColorConvertFloat4ToU32(colors[.Foreground]))
+        im.DrawList_AddRectFilled(draw_list, start + {4, 4}, start + {text_size, 28}, im.ColorConvertFloat4ToU32(colors[.Foreground]))
+
+        im.DrawList_AddText(draw_list, start + {8, 8}, im.ColorConvertFloat4ToU32(colors[.Text]), "Scene")
+
+        entities := app.scene.entities
+        for entity, i in entities {
+            btn := create_bar_text_button({end.x - start.x - 16, 24}, {8, f32(64 + (i * 24))}, entity.name);
+            render_button(draw_list, btn, colors)
+        }
 
     }
 }
 
 // UI
-draw_ui :: proc() {
+draw_ui :: proc(app: ^Application) {
 
     io         := im.GetIO()
     screen_dim := [2]f32{io.DisplaySize.x, io.DisplaySize.y}
@@ -156,11 +202,11 @@ draw_ui :: proc() {
     fs_dock := create_dock()
     split_blank_dock(fs_dock, TITLE_BAR_CONTENT, .First, .XTop, 32)
     split_blank_dock(fs_dock.second_child, STATUS_BAR_CONTENT, .Second, .XBottom, 20)
-    split_blank_dock(fs_dock.second_child.first_child, TAB_CONTENT, .Second, .YBottom, 400 * size)
-    split_blank_dock(fs_dock.second_child.first_child.first_child, TAB_CONTENT, .Second, .XBottom, 300 * size)
-    split_blank_dock(fs_dock.second_child.first_child.first_child.first_child, TAB_CONTENT, .First, .YTop, 300 * size)
+    split_blank_dock(fs_dock.second_child.first_child, INSPECTOR_TAB_CONTENT, .Second, .YBottom, 400 * size)
+    split_blank_dock(fs_dock.second_child.first_child.first_child, ASSETS_TAB_CONTENT, .Second, .XBottom, 300 * size)
+    split_blank_dock(fs_dock.second_child.first_child.first_child.first_child, SCENE_TAB_CONTENT, .First, .YTop, 300 * size)
 
-    draw_dock(fs_dock, draw_list, {0, 0}, screen_dim)
+    draw_dock(fs_dock, draw_list, app, {0, 0}, screen_dim)
 
 }
 
@@ -181,7 +227,7 @@ create_dock_with_content :: proc(content: DockContent) -> ^DockSpace {
 }
 
 // Recurse throught a dock to draw it
-draw_dock :: proc(dock: ^DockSpace, draw_list: ^im.DrawList, start: Vector2f, end: Vector2f) {
+draw_dock :: proc(dock: ^DockSpace, draw_list: ^im.DrawList, app: ^Application, start: Vector2f, end: Vector2f) {
 
     if dock.dock_type == .Blank {
         // Nothing to do
@@ -189,27 +235,27 @@ draw_dock :: proc(dock: ^DockSpace, draw_list: ^im.DrawList, start: Vector2f, en
     if dock.dock_type == .Content {
 
         // Draw the content
-        dock.content.render(draw_list, start, end, DARK_THEME)
+        dock.content.render(draw_list, app, start, end, DARK_THEME)
 
     }
     if dock.dock_type == .Split {
 
         // Draw the two children
         if dock.split_type == .XTop {
-            draw_dock(dock.first_child, draw_list, start, {end.x, start.y + dock.split_pos})
-            draw_dock(dock.second_child, draw_list, {start.x, start.y + dock.split_pos}, end)
+            draw_dock(dock.first_child, draw_list, app, start, {end.x, start.y + dock.split_pos})
+            draw_dock(dock.second_child, draw_list, app, {start.x, start.y + dock.split_pos}, end)
         }
         if dock.split_type == .YTop {
-            draw_dock(dock.first_child, draw_list, start, {start.x + dock.split_pos, end.y})
-            draw_dock(dock.second_child, draw_list, {start.x + dock.split_pos, start.y}, end)
+            draw_dock(dock.first_child, draw_list, app, start, {start.x + dock.split_pos, end.y})
+            draw_dock(dock.second_child, draw_list, app, {start.x + dock.split_pos, start.y}, end)
         }
         if dock.split_type == .XBottom {
-            draw_dock(dock.first_child, draw_list, start, {end.x, end.y - dock.split_pos})
-            draw_dock(dock.second_child, draw_list, {start.x, end.y - dock.split_pos}, end)
+            draw_dock(dock.first_child, draw_list, app, start, {end.x, end.y - dock.split_pos})
+            draw_dock(dock.second_child, draw_list, app, {start.x, end.y - dock.split_pos}, end)
         }
         if dock.split_type == .YBottom {
-            draw_dock(dock.first_child, draw_list, start, {end.x - dock.split_pos, end.y})
-            draw_dock(dock.second_child, draw_list, {end.x - dock.split_pos, start.y}, end)
+            draw_dock(dock.first_child, draw_list, app, start, {end.x - dock.split_pos, end.y})
+            draw_dock(dock.second_child, draw_list, app, {end.x - dock.split_pos, start.y}, end)
         }
 
     }
@@ -246,8 +292,8 @@ detect_mouse :: proc(start: Vector2f, end: Vector2f) -> bool {
 
 }
 
-// Makes a button with text
-create_text_button :: proc(height: f32, pos: Vector2f, text: string) -> DockButton {
+// Makes a header button with text
+create_header_text_button :: proc(height: f32, pos: Vector2f, text: string) -> DockButton {
 
     return DockButton {
         size   = {im.CalcTextSize(strings.clone_to_cstring(text)).x + 20, height},
@@ -270,8 +316,35 @@ create_text_button :: proc(height: f32, pos: Vector2f, text: string) -> DockButt
 
 }
 
+// Makes a bar button with text
+create_bar_text_button :: proc(size: Vector2f, pos: Vector2f, text: string) -> DockButton {
+
+    return DockButton {
+        size   = size,
+        pos    = pos,
+        text   = text,
+        render = proc(draw_list: ^im.DrawList, start: Vector2f, end: Vector2f, text: string, colors: map[ThemeColor]ColorRGBA) {
+
+            if detect_mouse(start, end) {
+                im.DrawList_AddRectFilled(draw_list, start, end, im.ColorConvertFloat4ToU32(colors[.Highlight]))
+            } else {
+                im.DrawList_AddRectFilled(draw_list, start, end, im.ColorConvertFloat4ToU32(colors[.Foreground]))
+            }
+
+            im.DrawList_AddText(draw_list, start + {4, (end.y - start.y) / 2 - 6}, im.ColorConvertFloat4ToU32(colors[.Text]), strings.clone_to_cstring(text))
+
+        },
+    }
+}
+
 render_button :: proc(draw_list: ^im.DrawList, button: DockButton, colors: map[ThemeColor]ColorRGBA) {
 
     button.render(draw_list, button.pos, button.pos + button.size, button.text, colors)
+
+}
+
+is_button_clicked :: proc(button: DockButton) -> bool {
+
+    return detect_mouse(button.pos, button.pos + button.size) && im.IsMouseClicked(.Left)
 
 }

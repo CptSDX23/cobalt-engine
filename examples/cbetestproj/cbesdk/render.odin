@@ -175,7 +175,7 @@ create_render_ctx :: proc(win_settings: WindowSettings) -> (RenderContext, FPSSt
 }
 
 // The boolean indicates whether the application should exit
-run_render :: proc(ctx: RenderContext, input: ^InputState, fps_state: ^FPSState) -> bool {
+run_render :: proc(ctx: RenderContext, input: ^InputState, fps_state: ^FPSState, app: ^Application) -> bool {
 
         // Stupid reset
         set_mouse_delta(input, {0, 0})
@@ -217,7 +217,7 @@ run_render :: proc(ctx: RenderContext, input: ^InputState, fps_state: ^FPSState)
         im_gpu.NewFrame()
         im_sdl.NewFrame()
         im.NewFrame()
-        draw_ui()
+        draw_ui(app)
 
         // Render
         cmd_buf   := sdl.AcquireGPUCommandBuffer(ctx.gpu)
