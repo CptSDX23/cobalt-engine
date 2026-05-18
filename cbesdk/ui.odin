@@ -2,9 +2,9 @@
 
 package cbesdk
 
-import "core:debug/trace"
 import "core:fmt"
 import "core:strings"
+import "core:strconv"
 import im "shared:imgui"
 
 DockSpace :: struct {
@@ -17,7 +17,7 @@ DockSpace :: struct {
 }
 
 DockContent :: struct {
-    render: proc(draw_list: ^im.DrawList, app: ^Application, start: Vector2f, end: Vector2f, colors: map[ThemeColor]ColorRGBA),
+    render: proc(draw_list: ^im.DrawList, app: ^Application, start: Vector2f, end: Vector2f, vars: ^map[string]DockVariable, colors: map[ThemeColor]ColorRGBA),
 }
 
 DockButton :: struct {
@@ -29,10 +29,10 @@ DockButton :: struct {
 
 // Variables so docks can communicate
 DockVariable :: struct {
-    name:  string,
-    value: string,
+    writer: string,
+    value:  string,
 }
-dock_vars: [dynamic]^DockVariable
+dock_vars: map[string]DockVariable
 
 // Types
 DockType :: enum {
@@ -98,7 +98,7 @@ LIGHT_THEME := map[ThemeColor]ColorRGBA {
 
 // Dock content types
 TITLE_BAR_CONTENT :: DockContent {
-    render = proc(draw_list: ^im.DrawList, app: ^Application, start: Vector2f, end: Vector2f, colors: map[ThemeColor]ColorRGBA) {
+    render = proc(draw_list: ^im.DrawList, app: ^Application, start: Vector2f, end: Vector2f, vars: ^map[string]DockVariable, colors: map[ThemeColor]ColorRGBA) {
         
         im.DrawList_AddRectFilled(draw_list, start, end, im.ColorConvertFloat4ToU32(colors[.Accent]))
 
@@ -129,7 +129,7 @@ TITLE_BAR_CONTENT :: DockContent {
 }
 
 STATUS_BAR_CONTENT :: DockContent {
-    render = proc(draw_list: ^im.DrawList, app: ^Application, start: Vector2f, end: Vector2f, colors: map[ThemeColor]ColorRGBA) {
+    render = proc(draw_list: ^im.DrawList, app: ^Application, start: Vector2f, end: Vector2f, vars: ^map[string]DockVariable, colors: map[ThemeColor]ColorRGBA) {
 
         version_text   := strings.clone_to_cstring(strings.concatenate({"Cobalt Engine ", current_version()}))
         proj_path_text := strings.split(app.settings.abs_proj_path, "\\")[len(strings.split(app.settings.abs_proj_path, "\\")) - 1]
@@ -143,7 +143,7 @@ STATUS_BAR_CONTENT :: DockContent {
 }
 
 INSPECTOR_TAB_CONTENT :: DockContent {
-    render = proc(draw_list: ^im.DrawList, app: ^Application, start: Vector2f, end: Vector2f, colors: map[ThemeColor]ColorRGBA) {
+    render = proc(draw_list: ^im.DrawList, app: ^Application, start: Vector2f, end: Vector2f, vars: ^map[string]DockVariable, colors: map[ThemeColor]ColorRGBA) {
 
         text_size := im.CalcTextSize(strings.clone_to_cstring("Inspector")).x + 14
 
@@ -153,11 +153,28 @@ INSPECTOR_TAB_CONTENT :: DockContent {
 
         im.DrawList_AddText(draw_list, start + {8, 8}, im.ColorConvertFloat4ToU32(colors[.Text]), "Inspector")
 
+        // Inspect entity
+        if vars["InspectorObject"].writer == "Scene" {
+
+            // Get properties
+            uuid, _   := strconv.parse_i128(vars["InspectorObject"].value)
+            name      := query_scene_entity(&app.scene, uuid).name
+            name_text := strings.clone_to_cstring(strings.concatenate({"Entity: ", name}))
+            uuid_text := strings.clone_to_cstring(strings.concatenate({"UUID ", vars["InspectorObject"].value}))
+
+            // Get components
+            components := query_entity_components(&app.scene, uuid)
+
+            im.DrawList_AddText(draw_list, start + {12, 40}, im.ColorConvertFloat4ToU32(colors[.Text]), name_text)
+            im.DrawList_AddText(draw_list, start + {12, 60}, im.ColorConvertFloat4ToU32(colors[.TextDisabled]), uuid_text)
+
+        }
+
     }
 }
 
 ASSETS_TAB_CONTENT :: DockContent {
-    render = proc(draw_list: ^im.DrawList, app: ^Application, start: Vector2f, end: Vector2f, colors: map[ThemeColor]ColorRGBA) {
+    render = proc(draw_list: ^im.DrawList, app: ^Application, start: Vector2f, end: Vector2f, vars: ^map[string]DockVariable, colors: map[ThemeColor]ColorRGBA) {
 
         text_size := im.CalcTextSize(strings.clone_to_cstring("Assets")).x + 14
 
@@ -171,7 +188,7 @@ ASSETS_TAB_CONTENT :: DockContent {
 }
 
 SCENE_TAB_CONTENT :: DockContent {
-    render = proc(draw_list: ^im.DrawList, app: ^Application, start: Vector2f, end: Vector2f, colors: map[ThemeColor]ColorRGBA) {
+    render = proc(draw_list: ^im.DrawList, app: ^Application, start: Vector2f, end: Vector2f, vars: ^map[string]DockVariable, colors: map[ThemeColor]ColorRGBA) {
 
         text_size := im.CalcTextSize(strings.clone_to_cstring("Scene")).x + 14
 
@@ -185,6 +202,9 @@ SCENE_TAB_CONTENT :: DockContent {
         for entity, i in entities {
             btn := create_bar_text_button({end.x - start.x - 16, 24}, {8, f32(64 + (i * 24))}, entity.name);
             render_button(draw_list, btn, colors)
+            if is_button_clicked(btn) {
+                vars["InspectorObject"] = DockVariable { "Scene", fmt.tprint(entity.uuid) }
+            }
         }
 
     }
@@ -198,7 +218,7 @@ draw_ui :: proc(app: ^Application) {
     draw_list  := im.GetBackgroundDrawList()
 
     // Default docking
-    size := f32(1)
+    size    := f32(1)
     fs_dock := create_dock()
     split_blank_dock(fs_dock, TITLE_BAR_CONTENT, .First, .XTop, 32)
     split_blank_dock(fs_dock.second_child, STATUS_BAR_CONTENT, .Second, .XBottom, 20)
@@ -206,7 +226,7 @@ draw_ui :: proc(app: ^Application) {
     split_blank_dock(fs_dock.second_child.first_child.first_child, ASSETS_TAB_CONTENT, .Second, .XBottom, 300 * size)
     split_blank_dock(fs_dock.second_child.first_child.first_child.first_child, SCENE_TAB_CONTENT, .First, .YTop, 300 * size)
 
-    draw_dock(fs_dock, draw_list, app, {0, 0}, screen_dim)
+    draw_dock(fs_dock, draw_list, app, &dock_vars, {0, 0}, screen_dim)
 
 }
 
@@ -227,35 +247,33 @@ create_dock_with_content :: proc(content: DockContent) -> ^DockSpace {
 }
 
 // Recurse throught a dock to draw it
-draw_dock :: proc(dock: ^DockSpace, draw_list: ^im.DrawList, app: ^Application, start: Vector2f, end: Vector2f) {
+draw_dock :: proc(dock: ^DockSpace, draw_list: ^im.DrawList, app: ^Application, vars: ^map[string]DockVariable, start: Vector2f, end: Vector2f) {
 
     if dock.dock_type == .Blank {
         // Nothing to do
     }
     if dock.dock_type == .Content {
-
         // Draw the content
-        dock.content.render(draw_list, app, start, end, DARK_THEME)
-
+        dock.content.render(draw_list, app, start, end, vars, DARK_THEME)
     }
     if dock.dock_type == .Split {
 
         // Draw the two children
         if dock.split_type == .XTop {
-            draw_dock(dock.first_child, draw_list, app, start, {end.x, start.y + dock.split_pos})
-            draw_dock(dock.second_child, draw_list, app, {start.x, start.y + dock.split_pos}, end)
+            draw_dock(dock.first_child, draw_list, app, vars, start, {end.x, start.y + dock.split_pos})
+            draw_dock(dock.second_child, draw_list, app, vars, {start.x, start.y + dock.split_pos}, end)
         }
         if dock.split_type == .YTop {
-            draw_dock(dock.first_child, draw_list, app, start, {start.x + dock.split_pos, end.y})
-            draw_dock(dock.second_child, draw_list, app, {start.x + dock.split_pos, start.y}, end)
+            draw_dock(dock.first_child, draw_list, app, vars, start, {start.x + dock.split_pos, end.y})
+            draw_dock(dock.second_child, draw_list, app, vars, {start.x + dock.split_pos, start.y}, end)
         }
         if dock.split_type == .XBottom {
-            draw_dock(dock.first_child, draw_list, app, start, {end.x, end.y - dock.split_pos})
-            draw_dock(dock.second_child, draw_list, app, {start.x, end.y - dock.split_pos}, end)
+            draw_dock(dock.first_child, draw_list, app, vars, start, {end.x, end.y - dock.split_pos})
+            draw_dock(dock.second_child, draw_list, app, vars, {start.x, end.y - dock.split_pos}, end)
         }
         if dock.split_type == .YBottom {
-            draw_dock(dock.first_child, draw_list, app, start, {end.x - dock.split_pos, end.y})
-            draw_dock(dock.second_child, draw_list, app, {end.x - dock.split_pos, start.y}, end)
+            draw_dock(dock.first_child, draw_list, app, vars, start, {end.x - dock.split_pos, end.y})
+            draw_dock(dock.second_child, draw_list, app, vars, {end.x - dock.split_pos, start.y}, end)
         }
 
     }
@@ -331,20 +349,16 @@ create_bar_text_button :: proc(size: Vector2f, pos: Vector2f, text: string) -> D
                 im.DrawList_AddRectFilled(draw_list, start, end, im.ColorConvertFloat4ToU32(colors[.Foreground]))
             }
 
-            im.DrawList_AddText(draw_list, start + {4, (end.y - start.y) / 2 - 6}, im.ColorConvertFloat4ToU32(colors[.Text]), strings.clone_to_cstring(text))
+            im.DrawList_AddText(draw_list, start + {4, (end.y - start.y) / 2 - 7}, im.ColorConvertFloat4ToU32(colors[.Text]), strings.clone_to_cstring(text))
 
         },
     }
 }
 
 render_button :: proc(draw_list: ^im.DrawList, button: DockButton, colors: map[ThemeColor]ColorRGBA) {
-
     button.render(draw_list, button.pos, button.pos + button.size, button.text, colors)
-
 }
 
 is_button_clicked :: proc(button: DockButton) -> bool {
-
     return detect_mouse(button.pos, button.pos + button.size) && im.IsMouseClicked(.Left)
-
 }

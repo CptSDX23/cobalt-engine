@@ -146,6 +146,33 @@ write_back_component :: proc(scene: ^Scene, $T: typeid, comp: T, index: i32) {
 
 }
 
+// Find entity with a uuid
+query_scene_entity :: proc(scene: ^Scene, uuid: i128) -> Entity {
+
+    for entity in scene.entities {
+        if entity.uuid == uuid {
+            return entity
+        }
+    }
+    return Entity {}
+
+}
+
+// Find all components for an entity
+query_entity_components :: proc(scene: ^Scene, uuid: i128) -> [dynamic]Component {
+
+    matches := make([dynamic]Component)
+
+    for component in scene.components {
+        if component.entity_uuid == uuid {
+            append(&matches, component)
+        }
+    }
+
+    return matches
+
+}
+
 add_scene_entity :: proc(scene: ^Scene, entity: Entity) {
     append(&scene.entities, entity)
 }

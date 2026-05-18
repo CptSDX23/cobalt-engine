@@ -146,6 +146,18 @@ write_back_component :: proc(scene: ^Scene, $T: typeid, comp: T, index: i32) {
 
 }
 
+// Find entity with a uuid
+query_scene_entity :: proc(scene: ^Scene, uuid: i128) -> Entity {
+
+    for entity in scene.entities {
+        if entity.uuid == uuid {
+            return entity
+        }
+    }
+    return Entity {}
+
+}
+
 add_scene_entity :: proc(scene: ^Scene, entity: Entity) {
     append(&scene.entities, entity)
 }
